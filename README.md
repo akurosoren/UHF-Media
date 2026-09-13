@@ -1,145 +1,158 @@
-# HuluMedia
+# HuluMedia Video Studio Player
 
-A single-file Windows video player/editor built on the mpv engine, with
-rotate, crop, trim, and ffmpeg-based export. PyQt5 UI, dark theme, custom
-frameless window, single-instance behavior, and GPU-accelerated export with
-automatic CPU fallback.
+A desktop video player (Windows, PyQt5 + libmpv) with built‑in editing tools —
+rotate, crop, trim, export — merged with an integrated **"Identify Song"**
+feature powered by [Shazam](https://www.shazam.com/) (via
+[`shazamio`](https://github.com/dotX12/ShazamIO)).
+
+Click the 🎵 button while any video or audio file is open, and the app will
+sample ~10 seconds of audio from the middle of the file, send it to Shazam,
+and — if it gets a match — rename the file to `Artist - Title.ext` on disk.
+If the track isn't recognized (or anything goes wrong), **the file is left
+completely untouched**.
 
 ## Features
 
-**Playback**
-- mpv-based engine, wide codec/container support
-- Audio track selection, subtitle selection + live size/position adjustment
-- Automatic deinterlacing for interlaced sources
-- Screenshot capture (saved to Desktop)
-- Fullscreen (double-click the video, or a shortcut)
-- Automatically rewinds to the start when a video finishes
-- Drag & drop to open a video or subtitle (`.srt`) file
-- Launch directly by double-clicking a video file (Windows file association)
-- Single-instance: opening a second video re-uses the already-running window instead of starting a new process
-
-**Editing / Export**
-- **Rotate**: 90° clockwise, 90° counter-clockwise, 180° (upside-down) - live preview
-- **Crop**: draggable/resizable crop box over the video, live output resolution + aspect ratio display
-- **Trim**: pick a start/end range on the timeline and export only that clip
-  - Turning trim on opens a 1-minute window starting exactly at the current playback position
-  - Drag the handles for coarse adjustment, or use the `-1s`/`+1s` buttons for single-second precision
-  - The video seeks live to match while you drag or nudge the handles
-- **Export** applies crop + rotate + trim in a single ffmpeg pass:
-  - Matches the source bitrate
-  - Preserves interlacing when no rotation is applied; uses bob-deinterlacing automatically when rotating an interlaced source
-  - Automatically uses a GPU encoder (NVENC / QSV / AMF) when available, and silently falls back to CPU (libx264) if none is found, if the source is 10-bit+ (HDR sources - H.264 hardware encoders generally can't handle this), or if the GPU attempt fails at runtime
-  - Frame-accurate trim seeking (fast keyframe seek + accurate decode, not a full-file scan)
-  - Cancelling an in-progress export is a no-op, not an error
-
-**Window**
-- Custom (frameless) window with a dark title bar
-- Draggable from the title bar, resizable from the edges
-- Minimize / maximize / close / always-on-top buttons
-- Dark gray theme throughout
-
-## Keyboard & Mouse Shortcuts
-
-| Action | Shortcut |
-|---|---|
-| Play / Pause | Spacebar |
-| Seek 3s forward / back | Right / Left arrow |
-| Volume | Mouse wheel over the video |
-| Toggle fullscreen | Double-click on the video |
-| Exit fullscreen | Esc |
-| Maximize / restore window | Double-click the title bar |
+- Video playback via `libmpv` (subtitles, audio track switching, screenshots,
+  fullscreen, keyboard/mouse shortcuts)
+- Rotate (90° CW/CCW/180°), crop, and trim with `ffmpeg`-based export
+  (hardware encoding: NVENC / QSV / AMF, with automatic CPU fallback)
+- Single-instance mode: double‑clicking another video file re-uses the
+  already‑open window instead of spawning a new one
+- **Shazam song recognition + auto‑rename**, non‑destructive by design
 
 ## Requirements
 
-- Python 3.9+
-- `pip install PyQt5 mpv`
-- **libmpv** (`libmpv-2.dll`) - available from:
-  https://sourceforge.net/projects/mpv-player-windows/files/libmpv/
-- **ffmpeg + ffprobe** (only needed for editing/export; without them playback
-  still works, only export is disabled)
+| Component | Notes |
+|---|---|
+| Python 3.10 – 3.13 | Tested on 3.13 |
+| [PyQt5](https://pypi.org/project/PyQt5/) | GUI framework |
+| [python-mpv](https://pypi.org/project/mpv/) + `libmpv-2.dll` | Video engine — the DLL must sit next to the script/exe or be on `PATH` |
+| `ffmpeg.exe` + `ffprobe.exe` | For export (rotate/crop/trim) and for extracting audio for Shazam. Must be next to the script/exe or on `PATH` |
+| `numpy` | Audio buffer handling |
+| `shazamio` (+ its dependencies) | Song recognition |
+| Internet connection | Required at runtime for the Shazam API call |
 
-## Running From Source
+## Installation
 
+```bash
+pip install PyQt5 mpv numpy
 ```
-pip install PyQt5 mpv
+
+### Installing `shazamio` on Windows / Python 3.13
+
+`shazamio` depends on a Rust‑compiled component, `shazamio-core`. As of this
+writing, the exact version `shazamio` asks for (`1.1.2`) has **no prebuilt
+Windows wheel for Python 3.13**, so a plain `pip install shazamio` tries to
+compile it from source — which fails unless you have Rust *and* the MSVC
+linker (Visual Studio Build Tools) installed.
+
+The simplest fix is to install a newer `shazamio-core` that *does* ship a
+prebuilt Windows wheel (it's forward‑compatible via the `abi3` ABI tag), then
+install `shazamio` itself without letting pip downgrade it:
+
+```bash
+pip install shazamio-core==1.2.0
+pip install shazamio==0.8.1 --no-deps
+pip install aiofiles aiohttp aiohttp-retry anyio dataclass-factory pydantic pydub
+```
+
+pip will print a `shazamio 0.8.1 requires shazamio-core==1.1.2, but you have
+1.2.0` warning — this is expected and harmless; it's not an error.
+
+### Python 3.13: missing `audioop`
+
+Python 3.13 removed the built-in `audioop` module, which `pydub` (a
+`shazamio` dependency) still imports. Install the official backport:
+
+```bash
+pip install audioop-lts
+```
+
+### Verifying the install
+
+```bash
+python -c "import numpy, shazamio; from shazamio import Shazam; print('OK')"
+```
+
+If this prints `OK`, everything needed for the music‑ID feature is in place.
+
+## Running
+
+```bash
 python video_studio_player.py
 ```
 
-Place `libmpv-2.dll`, `ffmpeg.exe`, and `ffprobe.exe` in the same folder as
-`video_studio_player.py`.
+or double‑click a video file associated with the app; the path is picked up
+from `sys.argv[1]`.
 
-## Building an .exe (PyInstaller)
+## Building a standalone .exe (PyInstaller)
 
-> PyInstaller does not cross-compile - these steps must be run on a Windows
-> machine.
-
-```
+```bash
 pip install pyinstaller
-python -m PyInstaller --onedir --windowed --name HuluMedia video_studio_player.py
+python -m PyInstaller --onedir --windowed --name VideoStudioPlayer --icon=app.ico video_studio_player.py
 ```
 
-This produces a `dist\HuluMedia\` folder. On PyInstaller 6+, dependencies are
-placed in a `dist\HuluMedia\_internal\` subfolder. Copy these three files
-**into that folder** (copying them next to `HuluMedia.exe` as well is
-harmless if you're not sure which location applies to your PyInstaller
-version):
+- Omit `--icon=app.ico` if you don't have an icon file, or point it at your
+  own `.ico`.
+- If you re-run PyInstaller after changing dependencies, delete the stale
+  `build/`, `dist/`, and `*.spec` first so the new imports are picked up:
+  ```bash
+  del VideoStudioPlayer.spec
+  rmdir /s /q build
+  rmdir /s /q dist
+  ```
 
-- `libmpv-2.dll`
+### Files PyInstaller does **not** bundle automatically
+
+These are external binaries, not Python packages — copy them manually into
+`dist\VideoStudioPlayer\` after building:
+
 - `ffmpeg.exe`
 - `ffprobe.exe`
+- `libmpv-2.dll`
 
-`dist\HuluMedia\HuluMedia.exe` is the executable.
+Without them, playback may still work depending on how libmpv is resolved,
+but export and song‑recognition will fail.
 
-### Important: move the whole folder, not just the .exe
+### Distributing the app
 
-The `--onedir` build depends on the `_internal` folder sitting next to the
-`.exe`. If you copy **only the `.exe`** somewhere else, the app crashes on
-launch with:
+With `--onedir`, ship the **entire** `dist\VideoStudioPlayer\` folder (the
+`.exe`, the `_internal` folder, and the three files above) — not just the
+`.exe` on its own.
 
-```
-OSError: Cannot find mpv-1.dll, mpv-2.dll or libmpv-2.dll in your system %PATH%
-```
+On a very bare/clean Windows machine you may also need the
+[Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist),
+since `shazamio-core`'s compiled component depends on it. Most up-to-date
+Windows 10/11 systems already have it.
 
-For a portable link, create a **shortcut** (`.lnk`) to the `.exe` instead of
-moving the `.exe` itself.
+## How song recognition works
 
-### Windows file association (open by double-clicking a video)
+1. Click the 🎵 button (next to the screenshot button in the bottom
+   controls).
+2. The app reads the current file's duration from `mpv`. If it's longer than
+   30 seconds, it seeks to the midpoint; otherwise it reads from the start.
+3. ~10 seconds of stereo PCM audio is extracted with `ffmpeg` and checked for
+   silence (very quiet clips are skipped, not sent to Shazam).
+4. The audio is sent to Shazam via `shazamio`, in a background thread so the
+   UI never freezes.
+5. **Match found:** the file is renamed to `Artist - Title.ext` (name
+   collisions get a `(1)`, `(2)`, … suffix). Playback is not interrupted —
+   only the app's internal path tracking and the window title are updated.
+6. **No match, silence, or any error:** nothing on disk is touched; the
+   status bar reports what happened.
 
-Right-click a video file → **Open with** → **Choose another app** → **Look
-for another app on this PC** → select `dist\HuluMedia\HuluMedia.exe`
-**directly from its original location** (not a copied/moved instance).
+## Troubleshooting
 
-## Distributing a Build (e.g. via GitHub)
+| Symptom | Fix |
+|---|---|
+| `ModuleNotFoundError: No module named 'numpy'` | `pip install numpy` |
+| `Failed building wheel for shazamio-core` (Rust/`link.exe` errors) | Use the pinned `shazamio-core==1.2.0` + `--no-deps` install described above, instead of compiling from source |
+| `ModuleNotFoundError: No module named 'audioop'` / `'pyaudioop'` | `pip install audioop-lts` (Python 3.13 only) |
+| Icon build error: `FileNotFoundError: Icon input file ... not found` | Make sure `app.ico` exists in the folder you're running PyInstaller from, or drop `--icon=app.ico` from the command |
+| `pyinstaller: error: the following arguments are required: scriptname` | You forgot to pass the script filename — run the command from the folder containing `video_studio_player.py` and include it at the end of the command |
+| App builds but can't play video / export / recognize songs | Copy `ffmpeg.exe`, `ffprobe.exe`, and `libmpv-2.dll` into the `dist\VideoStudioPlayer\` folder next to the `.exe` |
 
-- The `dist\HuluMedia\` folder (PyQt5 + libmpv + ffmpeg bundled) will likely
-  exceed GitHub's 100 MB per-file limit for a regular repository. Upload the
-  zipped folder as a **GitHub Release asset** instead (limit is much higher
-  there), rather than committing it to the repo.
-- Unsigned PyInstaller executables commonly trigger a Windows SmartScreen
-  "unknown publisher" warning, and are occasionally flagged by antivirus
-  heuristics (a well-known false-positive pattern for PyInstaller binaries,
-  not specific to this project). Users typically need to click "More info →
-  Run anyway".
-- ffmpeg and libmpv are GPL/LGPL-licensed. Since they're invoked as separate
-  processes/libraries rather than statically linked into this codebase, this
-  project's own license isn't dictated by theirs - but when redistributing
-  their binaries, include their license/copyright notices alongside the zip
-  (available from ffmpeg.org and mpv.io).
+## License
 
-## Known Limitations
-
-- Some icons in the top bar (📂 💾 🔊 💬) come from Windows' color emoji font
-  and don't pick up the dark theme's text color - they render in their own
-  native colors. Plain symbol-based icons (↻ ↺ ⤾ ⛶ ⚙) do turn white.
-- Hardware-accelerated video *decoding* is disabled (`hwdec=no`). This is a
-  deliberate choice to work around an issue where hardware decoding fails to
-  display video when mpv is embedded in a Qt widget on Windows; the
-  trade-off is somewhat higher CPU usage during playback. (This is unrelated
-  to the GPU-accelerated *encoding* used during export, which is enabled
-  automatically when available.)
-- Window dragging/resizing uses `QWindow.startSystemMove()` /
-  `startSystemResize()` (requires Qt 5.15+).
-- HDR sources (10-bit, e.g. HDR10 HEVC) are exported to standard 8-bit H.264
-  without tone-mapping; colors may look flat/washed out compared to a proper
-  HDR-to-SDR conversion. Proper tone-mapping (e.g. via ffmpeg's `zscale`/
-  `tonemap` filters) is not implemented.
+Add your license of choice here.

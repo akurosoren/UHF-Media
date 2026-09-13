@@ -45,7 +45,14 @@ import sys
 import subprocess
 import math
 import functools
+import asyncio
+import wave
+import re
+import tempfile
 from datetime import datetime
+
+import numpy as np
+from shazamio import Shazam
 
 
 def _prepare_libmpv_search_path():
@@ -114,6 +121,17 @@ def _binary_path(name: str) -> str:
 FFMPEG = _binary_path("ffmpeg")
 FFPROBE = _binary_path("ffprobe")
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+# --------------------------------------------------------------------------- #
+#  Şarkı tanıma (music_renamer.py'den; Shazam ile tanıyıp dosyayı yeniden
+#  adlandırma) - PotPlayer izleme kısmı ATILDI çünkü artık zaten oynatılan
+#  dosyanın yolunu (self.current_path) doğrudan biliyoruz. Ses okuma için
+#  ayrıca bir ffmpeg aramaya da gerek yok; oynatıcının kendi FFMPEG'i
+#  kullanılıyor.
+# --------------------------------------------------------------------------- #
+MUSIC_ID_SAMPLE_RATE = 44100
+MUSIC_ID_READ_SECONDS = 10
+MUSIC_ID_SILENCE_THRESH = 0.01
 
 # Windows dosya ilişkilendirmesiyle (bir video dosyasına çift tıklama) her
 # seferinde YENİ bir işlem başlar. Tek pencere kalması için bu isimde bir
@@ -832,6 +850,116 @@ class ExportWorker(QThread):
 
 
 # --------------------------------------------------------------------------- #
+#  Arka planda Shazam ile şarkı tanıyıp dosyayı yeniden adlandıran thread
+#  (music_renamer.py'nin tanıma/adlandırma çekirdeği). UI donmasın diye
+#  QThread üzerinde çalışır. Tanınamazsa ya da bir hata oluşursa dosyaya
+#  KESİNLİKLE dokunmaz.
+# --------------------------------------------------------------------------- #
+class MusicIDWorker(QThread):
+    finished_ok = pyqtSignal(str, str, str)     # new_path, artist, title
+    finished_not_found = pyqtSignal()
+    finished_err = pyqtSignal(str)
+
+    def __init__(self, path, seek_to, seconds=MUSIC_ID_READ_SECONDS):
+        super().__init__()
+        self.path = path
+        self.seek_to = seek_to
+        self.seconds = seconds
+
+    def run(self):
+        wav_path = None
+        try:
+            audio = self._extract_audio(self.path, self.seek_to, self.seconds)
+
+            vol = float(np.sqrt(np.mean(audio ** 2))) if audio.size else 0.0
+            if vol < MUSIC_ID_SILENCE_THRESH:
+                self.finished_not_found.emit()
+                return
+
+            wav_path = os.path.join(tempfile.gettempdir(), "_hulumedia_musicid.wav")
+            self._save_wav(audio, wav_path)
+
+            result = asyncio.run(self._shazam_recognize(wav_path))
+            if not result:
+                self.finished_not_found.emit()
+                return
+
+            artist, title = result["artist"], result["title"]
+            new_path = self._rename_file(self.path, artist, title)
+            self.finished_ok.emit(new_path, artist, title)
+
+        except Exception as e:
+            # Herhangi bir hata (ffmpeg okuyamadı, Shazam'a ulaşılamadı,
+            # dosya yeniden adlandırılamadı - ör. başka bir program dosyayı
+            # kilitliyor - vb.) durumunda dosya olduğu gibi bırakılır.
+            self.finished_err.emit(str(e))
+        finally:
+            if wav_path and os.path.exists(wav_path):
+                try:
+                    os.remove(wav_path)
+                except Exception:
+                    pass
+
+    @staticmethod
+    def _extract_audio(path, seek_to, seconds):
+        cmd = [
+            FFMPEG, "-v", "quiet",
+            "-ss", str(seek_to), "-t", str(seconds),
+            "-i", path,
+            "-ac", "2", "-ar", str(MUSIC_ID_SAMPLE_RATE),
+            "-f", "f32le", "-",
+        ]
+        result = subprocess.run(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            creationflags=NO_WINDOW,
+        )
+        if not result.stdout:
+            raise RuntimeError(
+                "Ses okunamadı: " + result.stderr.decode(errors="replace")[:200]
+            )
+        audio = np.frombuffer(result.stdout, dtype="float32")
+        if len(audio) % 2 != 0:
+            audio = audio[:-1]
+        return audio.reshape(-1, 2)
+
+    @staticmethod
+    def _save_wav(audio, path):
+        pcm = (np.clip(audio, -1.0, 1.0) * 32767).astype(np.int16).flatten()
+        with wave.open(path, "wb") as wf:
+            wf.setnchannels(2)
+            wf.setsampwidth(2)
+            wf.setframerate(MUSIC_ID_SAMPLE_RATE)
+            wf.writeframes(pcm.tobytes())
+
+    @staticmethod
+    async def _shazam_recognize(wav_path):
+        shazam = Shazam()
+        result = await shazam.recognize(wav_path)
+        track = result.get("track")
+        if track:
+            return {
+                "title": track.get("title", "Unknown"),
+                "artist": track.get("subtitle", "Unknown Artist"),
+            }
+        return None
+
+    @staticmethod
+    def _rename_file(old_path, artist, title):
+        directory, base = os.path.split(old_path)
+        ext = os.path.splitext(base)[1]
+        safe = re.sub(r'[\\/*?:"<>|]', "", f"{artist} - {title}").strip()
+        new_path = os.path.join(directory, safe + ext)
+        if os.path.abspath(new_path) == os.path.abspath(old_path):
+            return old_path
+        counter = 1
+        while os.path.exists(new_path):
+            new_path = os.path.join(directory, f"{safe} ({counter}){ext}")
+            counter += 1
+        os.rename(old_path, new_path)
+        return new_path
+
+
+# --------------------------------------------------------------------------- #
 #  Ana pencere: HULU-Player oynatma özellikleri + döndür/kırp/dışa aktar
 # --------------------------------------------------------------------------- #
 class VideoStudioPlayer(QMainWindow):
@@ -864,6 +992,7 @@ class VideoStudioPlayer(QMainWindow):
         self._export_cancelled = False
         self._export_preserve_interlace = False
         self._export_field_order = None
+        self._music_id_worker = None
 
         self._build_ui()
         self._connect_signals()
@@ -1059,6 +1188,14 @@ class VideoStudioPlayer(QMainWindow):
         self.screenshot_btn.setToolTip("Ekran görüntüsü al (Masaüstüne kaydedilir)")
         controls_layout.addWidget(self.screenshot_btn)
 
+        self.music_id_btn = QPushButton("🎵")
+        self.music_id_btn.setFixedWidth(40)
+        self.music_id_btn.setToolTip(
+            "Şarkıyı Tanı (Shazam) ve Dosyayı Yeniden Adlandır\n"
+            "Tanınamazsa dosyaya hiç dokunulmaz."
+        )
+        controls_layout.addWidget(self.music_id_btn)
+
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(80)
@@ -1152,6 +1289,7 @@ class VideoStudioPlayer(QMainWindow):
         self.btn_close.clicked.connect(self.close)
         self.play_btn.clicked.connect(self.toggle_play)
         self.screenshot_btn.clicked.connect(self.take_screenshot)
+        self.music_id_btn.clicked.connect(self.identify_and_rename_track)
         self.volume_slider.valueChanged.connect(self.set_volume)
         self.seek_slider.sliderPressed.connect(self._seek_start)
         self.seek_slider.sliderReleased.connect(self._seek_end)
@@ -1181,7 +1319,7 @@ class VideoStudioPlayer(QMainWindow):
         tüm kontrol widget'larının klavye odağını kapatıyoruz."""
         for w in (
             self.btn_open, self.btn_pin, self.btn_min, self.btn_max, self.btn_close,
-            self.play_btn, self.screenshot_btn, self.volume_slider,
+            self.play_btn, self.screenshot_btn, self.music_id_btn, self.volume_slider,
             self.seek_slider, self.audio_combo, self.subtitle_combo,
             self.subtitle_settings_btn, self.chk_rotate, self.radio_cw,
             self.radio_ccw, self.radio_180, self.chk_crop, self.chk_trim,
@@ -1311,6 +1449,56 @@ class VideoStudioPlayer(QMainWindow):
             self.player.screenshot_to_file(filename, includes="subtitles")
         except Exception as e:
             print("Ekran görüntüsü alınamadı:", e)
+
+    # ------------------------------------------------------- şarkı tanıma
+    def identify_and_rename_track(self):
+        """Şu an açık olan dosyanın ortasından ~10 saniyelik ses alıp
+        Shazam ile tanımaya çalışır. Tanırsa dosyayı "Sanatçı - Şarkı"
+        olarak yeniden adlandırır; tanıyamazsa veya bir hata olursa
+        dosyaya HİÇ dokunmaz."""
+        if not self.current_path:
+            self.status_label.setText("Önce bir dosya açın.")
+            return
+        if self._music_id_worker is not None:
+            return  # zaten devam eden bir tanıma var
+
+        try:
+            duration = self.player.duration
+        except Exception:
+            duration = None
+        seek_to = (duration / 2) if (duration and duration > 30) else 0
+
+        self.music_id_btn.setEnabled(False)
+        self.status_label.setText("🎵 Şarkı tanınıyor…")
+
+        self._music_id_worker = MusicIDWorker(self.current_path, seek_to)
+        self._music_id_worker.finished_ok.connect(self._on_music_id_ok)
+        self._music_id_worker.finished_not_found.connect(self._on_music_id_not_found)
+        self._music_id_worker.finished_err.connect(self._on_music_id_err)
+        self._music_id_worker.start()
+
+    def _music_id_cleanup(self):
+        self.music_id_btn.setEnabled(True)
+        self._music_id_worker = None
+
+    def _on_music_id_ok(self, new_path, artist, title):
+        # Dosya zaten yeniden adlandırıldı; mpv aynı dosya tanıtıcısını
+        # (handle) kullanmaya devam ettiği için oynatma kesintiye
+        # uğramaz - sadece kendi takip ettiğimiz yolu ve pencere
+        # başlığını güncelliyoruz.
+        self.current_path = new_path
+        self.setWindowTitle(f"HuluMedia - {os.path.basename(new_path)}")
+        self.status_label.setText(f"✓ Tanındı: {artist} - {title}")
+        self._music_id_cleanup()
+
+    def _on_music_id_not_found(self):
+        self.status_label.setText("Şarkı tanınamadı. Dosyaya dokunulmadı.")
+        self._music_id_cleanup()
+
+    def _on_music_id_err(self, message):
+        self.status_label.setText("Tanıma başarısız oldu. Dosyaya dokunulmadı.")
+        print("Şarkı tanıma hatası:", message)
+        self._music_id_cleanup()
 
     def seek_relative(self, seconds):
         try:
