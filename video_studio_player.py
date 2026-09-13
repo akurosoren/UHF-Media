@@ -146,7 +146,7 @@ def detect_hw_encoder():
     try:
         out = subprocess.run(
             [FFMPEG, "-hide_banner", "-encoders"],
-            capture_output=True, text=True, creationflags=NO_WINDOW, timeout=5,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW, timeout=5,
         ).stdout
     except Exception:
         return None
@@ -162,6 +162,17 @@ def fmt_time(seconds) -> str:
     seconds = int(seconds)
     m, s = divmod(seconds, 60)
     return f"{m:02d}:{s:02d}"
+
+
+def fmt_time_hms(seconds) -> str:
+    """Uzun videolarda (ör. 2 saatlik bir film) kesme başlangıç/bitiş
+    zamanını netlik için SAAT:DAKİKA:SANİYE olarak gösterir."""
+    if not seconds or seconds < 0:
+        seconds = 0
+    seconds = int(seconds)
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 def aspect_ratio_str(w: int, h: int) -> str:
@@ -611,6 +622,179 @@ class CropOverlay(QWidget):
 
 
 # --------------------------------------------------------------------------- #
+#  KESME (trim) çubuğu - zaman çizgisinin altında görünen, başlangıç/bitiş
+#  tutamaçlarıyla sürüklenerek ayarlanan aralık seçici. Sadece 0..1 arası
+#  ORAN tutar; saniyeye çevirmek için süreyi (set_duration) bilmesi gerekir.
+# --------------------------------------------------------------------------- #
+class TrimBar(QWidget):
+    changed = pyqtSignal()
+    preview_seek = pyqtSignal(float)  # 0..1 oran - sürüklenen tutamacın anlık konumu
+    MIN_GAP_RATIO = 0.005  # tutamaçların birbirine yapışmasını engeller
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumHeight(20)
+        self.setMouseTracking(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self._start = 0.0
+        self._end = 1.0
+        self._duration = 0.0
+        self._drag_mode = None       # None | "start" | "end" | "range"
+        self._drag_anchor_x = 0
+        self._drag_anchor_vals = (0.0, 1.0)
+
+    def set_duration(self, seconds):
+        self._duration = float(seconds) if seconds else 0.0
+        self.update()
+
+    def reset(self):
+        self._start, self._end = 0.0, 1.0
+        self.update()
+        self.changed.emit()
+
+    def set_window_seconds(self, from_seconds, window_seconds):
+        """Kesme aralığını, TAM OLARAK verilen andan BAŞLAYIP ileri doğru
+        WINDOW_SECONDS uzunluğunda bir pencereye ayarlar (ör. "durduğum
+        noktadan itibaren 1 dakikalık bir şerit"). Video sonuna çok
+        yakınsa pencere kısalır (geriye taşmaz, başlangıç sabit kalır)."""
+        if self._duration <= 0:
+            self.reset()
+            return
+        start_s = max(0.0, min(from_seconds, self._duration))
+        end_s = min(self._duration, start_s + window_seconds)
+        self._start = start_s / self._duration
+        self._end = end_s / self._duration
+        self.update()
+        self.changed.emit()
+
+    def nudge_start(self, delta_seconds):
+        """Başlangıç tutamacını SANİYE hassasiyetinde kaydırır - fareyle
+        piksel piksel sürüklemek uzun bir videoda çok kaba kalabiliyor,
+        bu tam olarak o hassasiyeti sağlıyor."""
+        if self._duration <= 0:
+            return
+        delta_ratio = delta_seconds / self._duration
+        self._start = max(0.0, min(self._start + delta_ratio, self._end - self.MIN_GAP_RATIO))
+        self.update()
+        self.changed.emit()
+        # Sürüklemede olduğu gibi, +/- ile ayarlarken de videoyu o ana
+        # canlı olarak atlatıyoruz - senkronize, ne kestiğini görebilesin.
+        self.preview_seek.emit(self._start)
+
+    def nudge_end(self, delta_seconds):
+        if self._duration <= 0:
+            return
+        delta_ratio = delta_seconds / self._duration
+        self._end = min(1.0, max(self._end + delta_ratio, self._start + self.MIN_GAP_RATIO))
+        self.update()
+        self.changed.emit()
+        self.preview_seek.emit(self._end)
+
+    def start_ratio(self):
+        return self._start
+
+    def end_ratio(self):
+        return self._end
+
+    def start_seconds(self):
+        return self._start * self._duration
+
+    def end_seconds(self):
+        return self._end * self._duration
+
+    def is_full_range(self):
+        return self._start <= 0.0005 and self._end >= 0.9995
+
+    def _handle_rects(self):
+        w = max(1, self.width() - 1)
+        x0 = int(self._start * w)
+        x1 = int(self._end * w)
+        left = QRect(x0 - 5, 1, 10, self.height() - 2)
+        right = QRect(x1 - 5, 1, 10, self.height() - 2)
+        return left, right, x0, x1
+
+    def mousePressEvent(self, event):
+        if event.button() != Qt.LeftButton:
+            return
+        left, right, x0, x1 = self._handle_rects()
+        pos = event.pos()
+        if left.contains(pos):
+            self._drag_mode = "start"
+        elif right.contains(pos):
+            self._drag_mode = "end"
+        elif x0 < pos.x() < x1:
+            self._drag_mode = "range"
+            self._drag_anchor_x = pos.x()
+            self._drag_anchor_vals = (self._start, self._end)
+        else:
+            # boş bir yere tıklanınca en yakın tutamacı oraya taşı
+            w = max(1, self.width() - 1)
+            ratio = max(0.0, min(1.0, pos.x() / w))
+            if abs(ratio - self._start) <= abs(ratio - self._end):
+                self._start = min(ratio, self._end - self.MIN_GAP_RATIO)
+                self._drag_mode = "start"
+            else:
+                self._end = max(ratio, self._start + self.MIN_GAP_RATIO)
+                self._drag_mode = "end"
+            self.update()
+            self.changed.emit()
+        self._emit_preview_for_current_mode()
+
+    def _emit_preview_for_current_mode(self):
+        # Sürüklenen tutamacın (ya da aralık taşınıyorsa aralığın
+        # başlangıcının) tam olarak hangi saniyede olduğunu oynatıcıya
+        # bildiriyoruz ki kullanıcı sürüklerken filmi canlı görsün.
+        if self._drag_mode == "start":
+            self.preview_seek.emit(self._start)
+        elif self._drag_mode == "end":
+            self.preview_seek.emit(self._end)
+        elif self._drag_mode == "range":
+            self.preview_seek.emit(self._start)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_mode is None:
+            return
+        w = max(1, self.width() - 1)
+        ratio = max(0.0, min(1.0, event.pos().x() / w))
+        if self._drag_mode == "start":
+            self._start = max(0.0, min(ratio, self._end - self.MIN_GAP_RATIO))
+        elif self._drag_mode == "end":
+            self._end = min(1.0, max(ratio, self._start + self.MIN_GAP_RATIO))
+        elif self._drag_mode == "range":
+            dx = (event.pos().x() - self._drag_anchor_x) / w
+            s0, e0 = self._drag_anchor_vals
+            span = e0 - s0
+            new_s = max(0.0, min(1.0 - span, s0 + dx))
+            self._start, self._end = new_s, new_s + span
+        self.update()
+        self.changed.emit()
+        self._emit_preview_for_current_mode()
+
+    def mouseReleaseEvent(self, event):
+        self._drag_mode = None
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        track = QRect(0, h // 2 - 3, w, 6)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(90, 90, 90))
+        painter.drawRoundedRect(track, 3, 3)
+
+        left, right, x0, x1 = self._handle_rects()
+        selected = QRect(x0, h // 2 - 3, max(1, x1 - x0), 6)
+        painter.setBrush(QColor(255, 59, 48, 190))
+        painter.drawRoundedRect(selected, 3, 3)
+
+        painter.setBrush(QColor(255, 255, 255))
+        painter.drawRoundedRect(left, 3, 3)
+        painter.drawRoundedRect(right, 3, 3)
+        painter.end()
+
+
+# --------------------------------------------------------------------------- #
 #  Arka planda ffmpeg çalıştıran thread (video_studio.py)
 # --------------------------------------------------------------------------- #
 class ExportWorker(QThread):
@@ -627,7 +811,7 @@ class ExportWorker(QThread):
         try:
             self.process = subprocess.Popen(
                 self.cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                creationflags=NO_WINDOW, text=True,
+                creationflags=NO_WINDOW, text=True, encoding="utf-8", errors="replace",
             )
             out, _ = self.process.communicate()
             if self.process.returncode == 0:
@@ -667,6 +851,7 @@ class VideoStudioPlayer(QMainWindow):
         self.current_path = None
         self.native_w = None
         self.native_h = None
+        self._last_tracks = []
         self.is_seeking = False
         self.sub_scale = 100
         self.sub_pos = 100
@@ -676,6 +861,7 @@ class VideoStudioPlayer(QMainWindow):
         self._export_filters = None
         self._export_output_path = None
         self._export_used_hw = False
+        self._export_cancelled = False
         self._export_preserve_interlace = False
         self._export_field_order = None
 
@@ -814,9 +1000,54 @@ class VideoStudioPlayer(QMainWindow):
         self.seek_slider = ClickableSlider(Qt.Horizontal)
         self.seek_slider.setRange(0, 1000)
         self.time_label = QLabel("00:00 / 00:00")
-        seek_layout.addWidget(self.seek_slider)
+
+        # ---- kesme (trim) çubuğu: makas işaretlenince zaman çizgisinin
+        # TAM ÜZERİNE biner (aynı hücrede üst üste) - kullanıcı tutamaçları
+        # doğrudan zaman çizgisi üzerinde sürükler, sürüklerken video o
+        # ana canlı olarak atlar (preview_seek sinyali).
+        self.trim_bar = TrimBar()
+        self.trim_bar.hide()
+        seek_stack = QGridLayout()
+        seek_stack.setContentsMargins(0, 0, 0, 0)
+        seek_stack.addWidget(self.seek_slider, 0, 0)
+        seek_stack.addWidget(self.trim_bar, 0, 0)
+        seek_stack_widget = QWidget()
+        seek_stack_widget.setLayout(seek_stack)
+
+        seek_layout.addWidget(seek_stack_widget, 1)
         seek_layout.addWidget(self.time_label)
         controls_panel_layout.addLayout(seek_layout)
+
+        # ---- kesme hassas ayar satırı: fareyle piksel piksel sürüklemek
+        # uzun bir videoda çok kaba kalıyor (ör. 2 saatlik bir filmde her
+        # piksel ~9 saniyeye denk gelebilir) - bu yüzden SANİYE hassasiyetinde
+        # ince ayar için küçük +/- düğmeleri ekliyoruz. Sadece kesme aktifken
+        # görünür.
+        self.lbl_trim_start = QLabel("00:00:00")
+        self.lbl_trim_end = QLabel("00:00:00")
+        self.btn_trim_start_minus = QPushButton("−1s")
+        self.btn_trim_start_plus = QPushButton("+1s")
+        self.btn_trim_end_minus = QPushButton("−1s")
+        self.btn_trim_end_plus = QPushButton("+1s")
+        for b in (self.btn_trim_start_minus, self.btn_trim_start_plus,
+                  self.btn_trim_end_minus, self.btn_trim_end_plus):
+            b.setFixedWidth(40)
+        trim_controls = QHBoxLayout()
+        trim_controls.setContentsMargins(0, 0, 0, 0)
+        trim_controls.addWidget(QLabel("Başlangıç:"))
+        trim_controls.addWidget(self.btn_trim_start_minus)
+        trim_controls.addWidget(self.lbl_trim_start)
+        trim_controls.addWidget(self.btn_trim_start_plus)
+        trim_controls.addSpacing(20)
+        trim_controls.addWidget(QLabel("Bitiş:"))
+        trim_controls.addWidget(self.btn_trim_end_minus)
+        trim_controls.addWidget(self.lbl_trim_end)
+        trim_controls.addWidget(self.btn_trim_end_plus)
+        trim_controls.addStretch(1)
+        self.trim_controls_row = QWidget()
+        self.trim_controls_row.setLayout(trim_controls)
+        self.trim_controls_row.hide()
+        controls_panel_layout.addWidget(self.trim_controls_row)
 
         controls_layout = QHBoxLayout()
         self.play_btn = QPushButton("▶")
@@ -877,6 +1108,12 @@ class VideoStudioPlayer(QMainWindow):
         self.chk_crop = QCheckBox("⛶")
         self.chk_crop.setToolTip("Kırpmayı Uygula")
 
+        self.chk_trim = QCheckBox("✂")
+        self.chk_trim.setToolTip(
+            "Kesme (Trim) Aralığı Seç - zaman çizgisinde başlangıç/bitiş "
+            "tutamaçlarını sürükleyip yalnızca o aralığı dışa aktarın."
+        )
+
         self.btn_export = QPushButton("💾")
         self.btn_export.setFixedWidth(44)
         self.btn_export.setToolTip("Dışa Aktar")
@@ -893,6 +1130,7 @@ class VideoStudioPlayer(QMainWindow):
         edit_row.addWidget(self.radio_180)
         edit_row.addSpacing(16)
         edit_row.addWidget(self.chk_crop)
+        edit_row.addWidget(self.chk_trim)
         edit_row.addStretch(1)
         edit_row.addWidget(self.btn_export)
 
@@ -926,6 +1164,13 @@ class VideoStudioPlayer(QMainWindow):
         self.radio_ccw.toggled.connect(self._on_rotate_settings_changed)
         self.radio_180.toggled.connect(self._on_rotate_settings_changed)
         self.chk_crop.stateChanged.connect(self._on_crop_toggle)
+        self.chk_trim.stateChanged.connect(self._on_trim_toggle)
+        self.trim_bar.changed.connect(self._update_trim_label)
+        self.trim_bar.preview_seek.connect(self._on_trim_preview_seek)
+        self.btn_trim_start_minus.clicked.connect(lambda: self.trim_bar.nudge_start(-1))
+        self.btn_trim_start_plus.clicked.connect(lambda: self.trim_bar.nudge_start(1))
+        self.btn_trim_end_minus.clicked.connect(lambda: self.trim_bar.nudge_end(-1))
+        self.btn_trim_end_plus.clicked.connect(lambda: self.trim_bar.nudge_end(1))
         self.btn_export.clicked.connect(self.do_export)
 
         self.video_frame.resized.connect(self._update_video_rect)
@@ -939,7 +1184,9 @@ class VideoStudioPlayer(QMainWindow):
             self.play_btn, self.screenshot_btn, self.volume_slider,
             self.seek_slider, self.audio_combo, self.subtitle_combo,
             self.subtitle_settings_btn, self.chk_rotate, self.radio_cw,
-            self.radio_ccw, self.radio_180, self.chk_crop, self.btn_export,
+            self.radio_ccw, self.radio_180, self.chk_crop, self.chk_trim,
+            self.trim_bar, self.btn_trim_start_minus, self.btn_trim_start_plus,
+            self.btn_trim_end_minus, self.btn_trim_end_plus, self.btn_export,
         ):
             w.setFocusPolicy(Qt.NoFocus)
 
@@ -974,6 +1221,9 @@ class VideoStudioPlayer(QMainWindow):
         self.native_w = self.native_h = None
         self.status_label.setText("")
         self.lbl_dim.hide()
+        self.chk_trim.setChecked(False)
+        self.trim_bar.hide()
+        self.trim_bar.reset()
 
         try:
             self.player.command("loadfile", path, "replace")
@@ -1107,7 +1357,15 @@ class VideoStudioPlayer(QMainWindow):
             self.seek_slider.blockSignals(True)
             self.seek_slider.setValue(max(0, min(1000, pos)))
             self.seek_slider.blockSignals(False)
-        self.time_label.setText(f"{fmt_time(current)} / {fmt_time(duration)}")
+
+        # Kesme (trim) modu aktifken zaman etiketi seçili aralığı gösterir
+        # (_update_trim_label), normal oynatma zamanını değil.
+        if self.chk_trim.isChecked():
+            if duration:
+                self.trim_bar.set_duration(duration)
+            self._update_trim_label()
+        else:
+            self.time_label.setText(f"{fmt_time(current)} / {fmt_time(duration)}")
 
         try:
             self.play_btn.setText("▶" if self.player.pause else "⏸")
@@ -1199,6 +1457,13 @@ class VideoStudioPlayer(QMainWindow):
             tracks = self.player.track_list
         except Exception:
             tracks = []
+
+        # Dışa aktarımda (özellikle çoklu ses izli MKV'lerde) tam olarak
+        # HANGİ kanalın seçili olduğunu bilebilmek için ham track listesini
+        # saklıyoruz - "ff-index" alanı mpv'nin bu iz için bildirdiği,
+        # ffmpeg'in de "-map 0:<ff-index>" ile doğrudan anlayacağı ham akış
+        # numarasıdır.
+        self._last_tracks = tracks
 
         self.audio_combo.blockSignals(True)
         self.audio_combo.clear()
@@ -1305,6 +1570,58 @@ class VideoStudioPlayer(QMainWindow):
         self.crop_overlay.set_active(self.chk_crop.isChecked())
         self._update_video_rect()
 
+    # ------------------------------------------------------------------ #
+    #  KESME (trim) - zaman çizgisinin altında bir aralık çubuğu gösterip
+    #  saklar; dışa aktarımda -ss/-t olarak ffmpeg'e verilir.
+    # ------------------------------------------------------------------ #
+    def _on_trim_toggle(self, *_):
+        checked = self.chk_trim.isChecked()
+        self.trim_bar.setVisible(checked)
+        self.trim_controls_row.setVisible(checked)
+        if checked:
+            try:
+                duration = self.player.duration
+            except Exception:
+                duration = None
+            try:
+                current = self.player.time_pos or 0.0
+            except Exception:
+                current = 0.0
+            if duration:
+                self.trim_bar.set_duration(duration)
+                # Tam olarak durduğun/izlediğin noktadan BAŞLAYIP ileri
+                # doğru 1 dakikalık bir şerit aç - tüm videoyu seçili
+                # göstermek yerine, "makas"ı aktif ettiğin andan itibaren
+                # küçük, kullanışlı bir aralık.
+                self.trim_bar.set_window_seconds(current, 60.0)
+            else:
+                self.trim_bar.reset()
+        self._update_trim_label()
+
+    def _update_trim_label(self):
+        if not self.chk_trim.isChecked():
+            return
+        start_s = self.trim_bar.start_seconds()
+        end_s = self.trim_bar.end_seconds()
+        self.time_label.setText(f"✂ {fmt_time(start_s)} - {fmt_time(end_s)}")
+        self.lbl_trim_start.setText(fmt_time_hms(start_s))
+        self.lbl_trim_end.setText(fmt_time_hms(end_s))
+
+    def _on_trim_preview_seek(self, ratio):
+        """Kullanıcı trim tutamacını sürüklerken çağrılır: videoyu o ana
+        canlı olarak atlatır, böylece hangi sahnede olduğu görülür."""
+        try:
+            duration = self.player.duration
+        except Exception:
+            duration = None
+        if not duration:
+            return
+        try:
+            self.player.pause = True
+            self.player.time_pos = max(0.0, min(duration, ratio * duration))
+        except Exception:
+            pass
+
     def _compute_display_rect(self) -> QRect:
         if not self.native_w or not self.native_h:
             return QRect()
@@ -1400,13 +1717,50 @@ class VideoStudioPlayer(QMainWindow):
     # ------------------------------------------------------------------ #
     #  Bitrate okuma (ffprobe) - video_studio.py
     # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------ #
+    #  Dışa aktarımda SADECE seçili video + seçili ses izini eşliyoruz.
+    #  Neden: -map hiç belirtilmezse ffmpeg kendi "en iyi" akışı seçme
+    #  sezgisiyle bir iz seçer - çoklu ses izli (İngilizce stereo + 5.1 +
+    #  Atmos/TrueHD gibi) MKV dosyalarında bu çoğunlukla oynatıcıda dinlemek
+    #  istediğiniz iz DEĞİL, en çok kanala sahip iz (ör. Atmos) olur; bu izin
+    #  "-c:a copy" ile kopyalanması bazı durumlarda ffmpeg'i başarısız
+    #  ediyor. Kullanıcının player'da seçtiği ses izini mpv'nin bildirdiği
+    #  "ff-index" (ffmpeg'in "-map 0:<N>" ile anladığı ham akış numarası)
+    #  üzerinden doğrudan eşleyerek bunu garanti altına alıyoruz.
+    # ------------------------------------------------------------------ #
+    def _get_export_stream_maps(self):
+        tracks = self._last_tracks or []
+        video_ff = None
+        for t in tracks:
+            if t.get("type") == "video" and t.get("selected"):
+                video_ff = t.get("ff-index")
+                break
+
+        selected_audio_id = self.audio_combo.currentData()
+        audio_ff = None
+        for t in tracks:
+            if t.get("type") == "audio" and t.get("id") == selected_audio_id:
+                audio_ff = t.get("ff-index")
+                break
+
+        maps = [
+            "-map", f"0:{video_ff}" if video_ff is not None else "0:v:0",
+            "-map", f"0:{audio_ff}" if audio_ff is not None else "0:a:0?",
+            # Altyazılar varsa oldukları gibi (kopyalanarak) taşınır; -map
+            # hiç belirtilmediğinde ffmpeg zaten benzer şekilde davranıyordu,
+            # bu davranışı koruyoruz. "?" işareti, hiç altyazı yoksa
+            # ffmpeg'in hata vermeden devam etmesini sağlar.
+            "-map", "0:s?", "-c:s", "copy",
+        ]
+        return maps
+
     def _get_source_bitrate(self, path):
         def probe(entries):
             try:
                 out = subprocess.check_output(
                     [FFPROBE, "-v", "error", "-select_streams", "v:0",
                      "-show_entries", entries, "-of", "default=noprint_wrappers=1:nokey=1", path],
-                    creationflags=NO_WINDOW, text=True,
+                    creationflags=NO_WINDOW, text=True, encoding="utf-8", errors="replace",
                 ).strip().splitlines()
                 for v in out:
                     if v.isdigit():
@@ -1421,7 +1775,7 @@ class VideoStudioPlayer(QMainWindow):
                 out = subprocess.check_output(
                     [FFPROBE, "-v", "error", "-show_entries", "format=bit_rate",
                      "-of", "default=noprint_wrappers=1:nokey=1", path],
-                    creationflags=NO_WINDOW, text=True,
+                    creationflags=NO_WINDOW, text=True, encoding="utf-8", errors="replace",
                 ).strip()
                 if out.isdigit():
                     rate = int(out)
@@ -1443,7 +1797,7 @@ class VideoStudioPlayer(QMainWindow):
                 [FFPROBE, "-v", "error", "-select_streams", "v:0",
                  "-show_entries", "stream=field_order",
                  "-of", "default=noprint_wrappers=1:nokey=1", path],
-                creationflags=NO_WINDOW, text=True,
+                creationflags=NO_WINDOW, text=True, encoding="utf-8", errors="replace",
             ).strip().lower()
         except Exception:
             return None
@@ -1469,13 +1823,44 @@ class VideoStudioPlayer(QMainWindow):
                 [FFPROBE, "-v", "error", "-select_streams", "v:0",
                  "-show_entries", "stream=r_frame_rate",
                  "-of", "default=noprint_wrappers=1:nokey=1", path],
-                creationflags=NO_WINDOW, text=True,
+                creationflags=NO_WINDOW, text=True, encoding="utf-8", errors="replace",
             ).strip()
         except Exception:
             return None
         if not out or out in ("0/0", "N/A"):
             return None
         return out
+
+    def _get_source_bit_depth(self, path):
+        """Kaynağın piksel derinliğini (8, 10, 12...) döndürür, okunamazsa
+        8 varsayar. H.264 donanım kodlayıcılar (nvenc/qsv/amf) çoğu sürücüde
+        10-bit+ girdiyi (çoğu HDR HEVC/AV1 içeriğin formatı) DESTEKLEMEZ -
+        H.264 standardının "High 10" profili donanımda neredeyse hiç
+        bulunmaz. Bu yüzden 10-bit+ kaynaklarda GPU'yu hiç DENEMEDEN
+        doğrudan CPU'ya (libx264) gidiyoruz - aksi halde önce başarısız
+        olması beklenen bir GPU denemesi için boşuna zaman kaybedilir,
+        sonra zaten CPU ile baştan başlanır (net sonuç: iki kat bekleme)."""
+        try:
+            out = subprocess.check_output(
+                [FFPROBE, "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=bits_per_raw_sample,pix_fmt",
+                 "-of", "default=noprint_wrappers=1:nokey=1", path],
+                creationflags=NO_WINDOW, text=True, encoding="utf-8", errors="replace",
+            ).strip().splitlines()
+        except Exception:
+            return 8
+        for line in out:
+            line = line.strip()
+            if line.isdigit() and int(line) > 0:
+                return int(line)
+        # bits_per_raw_sample boş dönmüş olabilir (bazı konteynerlerde
+        # yazılmaz) - piksel formatı adından tahmin et (ör. "yuv420p10le").
+        for line in out:
+            if "10le" in line or "10be" in line:
+                return 10
+            if "12le" in line or "12be" in line:
+                return 12
+        return 8
 
     # ------------------------------------------------------------------ #
     #  DIŞA AKTARMA (tek ffmpeg çağrısında kırpma + döndürme) - video_studio.py
@@ -1490,12 +1875,21 @@ class VideoStudioPlayer(QMainWindow):
 
         do_rotate = self.chk_rotate.isChecked()
         do_crop = self.chk_crop.isChecked() and self.crop_overlay.crop_ratio() is not None
+        do_trim = self.chk_trim.isChecked() and not self.trim_bar.is_full_range()
 
-        if not do_rotate and not do_crop:
+        if not do_rotate and not do_crop and not do_trim:
             QMessageBox.information(self, "Bilgi",
-                                     "Ne döndürme ne de kırpma seçili. "
-                                     "Uygulanacak bir işlem yok.")
+                                     "Ne döndürme, ne kırpma, ne de kesme (trim) "
+                                     "seçili. Uygulanacak bir işlem yok.")
             return
+
+        trim_start = trim_end = None
+        if do_trim:
+            trim_start = self.trim_bar.start_seconds()
+            trim_end = self.trim_bar.end_seconds()
+            if trim_end - trim_start < 0.1:
+                QMessageBox.warning(self, "Hata", "Kesme aralığı çok kısa.")
+                return
 
         if not check_ffmpeg():
             QMessageBox.critical(
@@ -1573,7 +1967,11 @@ class VideoStudioPlayer(QMainWindow):
 
         base, ext = os.path.splitext(self.current_path)
         ext = ext if ext else ".mp4"
-        suffix = ("_cropped" if do_crop else "") + ("_rotated" if do_rotate else "")
+        suffix = (
+            ("_cropped" if do_crop else "")
+            + ("_rotated" if do_rotate else "")
+            + ("_kesildi" if do_trim else "")
+        )
         output_path = f"{base}{suffix}{ext}"
 
         # Sonraki export'ta (ya da donanım kodlayıcı başarısız olup CPU'ya
@@ -1582,12 +1980,17 @@ class VideoStudioPlayer(QMainWindow):
         self._export_output_path = output_path
         self._export_preserve_interlace = preserve_interlace
         self._export_field_order = field_order if preserve_interlace else None
+        self._export_trim = (trim_start, trim_end) if do_trim else None
 
         # Donanım kodlayıcılarda (nvenc/qsv/amf) taramalı (interlaced)
-        # kodlama desteği güvenilir/tutarlı değil; tarama tipini korumak
-        # gerektiğinde her zaman libx264 (CPU) yoluna gidiyoruz.
+        # kodlama VE 10-bit+ (çoğu HDR HEVC/AV1 kaynağı) girdi desteği
+        # güvenilir/tutarlı değil; bu durumlarda GPU'yu hiç denemeden
+        # doğrudan libx264 (CPU) yoluna gidiyoruz - aksi halde önce
+        # başarısız olması beklenen bir GPU denemesi için boşuna
+        # beklenir, sonra zaten CPU ile baştan başlanır.
+        bit_depth = self._get_source_bit_depth(self.current_path)
         hw_encoder = detect_hw_encoder()
-        use_hw = bool(hw_encoder) and not preserve_interlace
+        use_hw = bool(hw_encoder) and not preserve_interlace and bit_depth <= 8
         self._start_export(filters, output_path, use_hw=use_hw)
 
     def _build_export_cmd(self, filters, output_path, use_hw: bool):
@@ -1600,7 +2003,51 @@ class VideoStudioPlayer(QMainWindow):
         bitrate = self._get_source_bitrate(self.current_path)
         hw_encoder = detect_hw_encoder() if use_hw else None
 
-        cmd = [FFMPEG, "-y", "-i", self.current_path, "-filter:v", ",".join(filters)]
+        # KESME (trim): İKİ AŞAMALI seek kullanıyoruz.
+        #   1) "-ss" -i'DEN ÖNCE (girdi/input seek) -> ffmpeg en yakın
+        #      anahtar kareye HIZLICA atlar, dosyanın başından o ana kadar
+        #      TÜM kareleri çözümlemek ZORUNDA KALMAZ. Uzun bir filmde
+        #      geç bir dakikadan kesim yaparken bekleme süresini saniyelere
+        #      indiren asıl kısım burası.
+        #   2) İkinci küçük "-ss" -i'DEN SONRA (çıktı/output seek) -> 1.
+        #      adımdaki anahtar kareyle gerçek hedef an arasındaki birkaç
+        #      saniyelik farkı KARE HASSASİYETİYLE kapatır. Zaten yeniden
+        #      kodladığımız için bu küçük parçayı çözmek neredeyse anlık.
+        trim = getattr(self, "_export_trim", None)
+        cmd = [FFMPEG, "-y"]
+        if trim:
+            trim_start, trim_end = trim
+            # NOT: Daha önce burada "-ss BÜYÜK -i dosya -ss KÜÇÜK" şeklinde
+            # iki aşamalı bir seek vardı ("hızlı kabaca atla + ince ayarla"
+            # tekniği). Bu, video AKIŞINI OLDUĞU GİBİ KOPYALAYARAK (-c copy)
+            # kesen durumlar için gereklidir - ama biz zaten HER ZAMAN
+            # görüntüyü yeniden kodluyoruz (crop/rotate filtreleri var).
+            # Yeniden kodlarken ffmpeg'in TEK bir "-ss" (girdi tarafında)
+            # kullanımı da hem HIZLIDIR (en yakın anahtar kareye dosyanın
+            # başından hiç okumadan atlar) HEM DE KARE HASSASİYETİNDEDİR
+            # (o anahtar kareden hedef ana kadar kareleri çözüp atar).
+            # İki aşamalı yöntem, kaynağa/konteynere göre birkaç saniye
+            # ERKEN başlama hatasına yol açabiliyordu - tek aşamalı seek
+            # bunu ortadan kaldırır.
+            cmd += ["-ss", f"{trim_start:.3f}", "-i", self.current_path,
+                    "-t", f"{max(0.0, trim_end - trim_start):.3f}"]
+        else:
+            cmd += ["-i", self.current_path]
+
+        video_filters = list(filters)
+        if hw_encoder and bitrate:
+            # Güvenlik önlemi: bit derinliği tespiti yanlış çıksa bile
+            # (ör. beklenmedik bir konteyner/etiketleme durumunda),
+            # donanım kodlayıcıya giden görüntüyü filtre zincirinde
+            # AÇIKÇA 8-bit'e çeviriyoruz. Sondaki "-pix_fmt" çıktı
+            # seçeneğine güvenmek yerine bunu filtergraph içinde yapmak,
+            # donanım kodlayıcılarla ilgili format uyumsuzluğu
+            # hatalarını daha güvenilir şekilde önlüyor.
+            video_filters.append("format=yuv420p")
+        if video_filters:
+            cmd += ["-filter:v", ",".join(video_filters)]
+
+        cmd += self._get_export_stream_maps()
 
         if hw_encoder and bitrate:
             bufsize = bitrate * 2
@@ -1642,6 +2089,7 @@ class VideoStudioPlayer(QMainWindow):
     def _start_export(self, filters, output_path, use_hw: bool):
         cmd, used_hw = self._build_export_cmd(filters, output_path, use_hw)
         self._export_used_hw = used_hw
+        self._export_cancelled = False
 
         self.progress = QProgressDialog("Video işleniyor, lütfen bekleyin...", "İptal", 0, 0, self)
         self.progress.setWindowTitle("Dışa Aktar")
@@ -1656,6 +2104,11 @@ class VideoStudioPlayer(QMainWindow):
         self.progress.show()
 
     def _cancel_export(self):
+        # Kullanıcı BİLEREK iptal etti - bu bir hata değil. İşaretliyoruz
+        # ki hem yanlış "başarısız oldu" mesajı çıkmasın, hem de GPU->CPU
+        # otomatik tekrar deneme mekanizması burada YANLIŞLIKLA devreye
+        # girip export'u istemeden CPU ile baştan başlatmasın.
+        self._export_cancelled = True
         if self.worker:
             self.worker.cancel()
 
@@ -1667,6 +2120,9 @@ class VideoStudioPlayer(QMainWindow):
     def _export_failed(self, message):
         if self.progress:
             self.progress.close()
+        if getattr(self, "_export_cancelled", False):
+            self.status_label.setText("Dışa aktarma iptal edildi.")
+            return
         # GPU kodlama listede görünse bile o bilgisayarda gerçekten
         # çalışacağının garantisi yok (sürücü sorunu vb.) - başarısız
         # olduysa kullanıcıyı hiç rahatsız etmeden CPU ile sessizce
