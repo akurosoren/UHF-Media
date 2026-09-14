@@ -1,4 +1,4 @@
-# HuluMedia Video Studio Player
+# UHF-Media Video Studio Player
 
 A desktop video player (Windows, PyQt5 + libmpv) with built‑in editing tools —
 rotate, crop, trim, export — merged with an integrated **"Identify Song"**
