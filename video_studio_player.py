@@ -435,6 +435,106 @@ class SubtitleSettingsDialog(QDialog):
 #  aynı boyutta) tutulur. crop_ratio() ile 0..1 aralığında, "video_rect" (yani
 #  harita/letterbox dışındaki gerçek video alanı) baz alınarak döndürülür.
 # --------------------------------------------------------------------------- #
+# 5x7'lik piksel-yazı tipi (retro/bit-map font) - sadece "UHF" için gereken
+# harfler tanımlı. '1' = dolu piksel, '0' = boş.
+_PIXEL_FONT_5X7 = {
+    "U": ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
+    "H": ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
+    "F": ["11111", "10000", "10000", "11110", "10000", "10000", "10000"],
+}
+
+
+def _draw_pixel_text(painter, text, x, y, pixel_size, color, letter_gap_cells=1):
+    """Verilen metni gerçek bir yazı tipi yerine kare piksellerden oluşan
+    bir bit-map font gibi çizer - referans görseldeki köşeli/retro "UHF"
+    görünümünü taklit eder. Sonraki çizim için kullanılabilecek x
+    konumunu (metnin bittiği yer) döndürür."""
+    painter.setPen(Qt.NoPen)
+    painter.setBrush(color)
+    cursor_x = x
+    for ch in text:
+        pattern = _PIXEL_FONT_5X7.get(ch.upper())
+        if pattern:
+            for row_idx, row in enumerate(pattern):
+                for col_idx, bit in enumerate(row):
+                    if bit == "1":
+                        painter.drawRect(
+                            cursor_x + col_idx * pixel_size,
+                            y + row_idx * pixel_size,
+                            pixel_size, pixel_size,
+                        )
+        cursor_x += (5 + letter_gap_cells) * pixel_size
+    return cursor_x
+
+
+class IdleSignalWidget(QWidget):
+    """Eski TV'lerin UHF kanal arama ekranını taklit eden açılış logosu:
+    piksel-yazı tipiyle kırmızı "UHF" yazısı + altında sarı bir "ayar
+    çubuğu" satırı. Bu satır önce birkaç KALIN çubuktan oluşur ("IIIIIIII"
+    gibi), ortadan sonra küçük NOKTALARA dönüşür ("............"); çubuk
+    segmentinin SON çubuğu, sinyal aranıyor hissi vermesi için yanıp
+    söner."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # video_frame gibi bu da NATIVE bir pencere olmalı, yoksa video_frame'in
+        # (mpv'nin gömülü olduğu) native yüzeyinin ARKASINDA kalıp hiç görünmez.
+        self.setAttribute(Qt.WA_DontCreateNativeAncestors)
+        self.setAttribute(Qt.WA_NativeWindow)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+
+        self._bar_visible = True
+        self._blink_timer = QTimer(self)
+        self._blink_timer.setInterval(500)
+        self._blink_timer.timeout.connect(self._toggle_bar)
+        self._blink_timer.start()
+
+    def _toggle_bar(self):
+        self._bar_visible = not self._bar_visible
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor(0, 0, 0))
+
+        logo_w, logo_h = 460, 180
+        ox = (self.width() - logo_w) // 2
+        oy = (self.height() - logo_h) // 2
+
+        # "UHF" - piksel yazı tipiyle
+        pixel_size = 10
+        _draw_pixel_text(painter, "UHF", ox, oy, pixel_size, QColor(232, 20, 10))
+        text_height = 7 * pixel_size
+
+        # Ayar çubuğu satırı: solda KALIN çubuklar ("I I I I I I I I"),
+        # ortadan itibaren küçük NOKTALAR ("."). Çubuk segmentinin SON
+        # çubuğu yanıp sönüyor.
+        row_top = oy + text_height + 26
+        bar_count = 8
+        bar_h = 34
+        segment_w = logo_w / 2
+        bar_pitch = segment_w / bar_count
+        bar_w = max(4.0, bar_pitch * 0.4)
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(255, 221, 0))
+        for i in range(bar_count):
+            if i == bar_count - 1 and not self._bar_visible:
+                continue  # son çubuk: yanıp sönme efekti
+            bx = ox + i * bar_pitch
+            painter.drawRect(int(bx), int(row_top), int(bar_w), int(bar_h))
+
+        # Noktalar: segmentin ortasından logonun sonuna kadar küçük daireler,
+        # çubuklarla aynı taban çizgisine hizalı.
+        dot_d = 8
+        dot_pitch = 16
+        dot_y = row_top + bar_h - dot_d
+        x = ox + segment_w + dot_pitch / 2
+        while x + dot_d <= ox + logo_w:
+            painter.drawEllipse(int(x), int(dot_y), dot_d, dot_d)
+            x += dot_pitch
+
+
 class CropOverlay(QWidget):
     HANDLE = 12
     changed = pyqtSignal()
@@ -494,23 +594,25 @@ class CropOverlay(QWidget):
         """Pencerenin gerçek şeklini kırpma kutusunun ETRAFI olacak şekilde
         keser; kutunun içi bu pencereden tamamen çıkarılır (gerçek bir delik),
         böylece altındaki video hiçbir alfa karıştırma olmadan görünür.
-        Kenar tutamaçlarının ve ortadaki taşıma tutamacının tıklanabilir
-        kalması için o alanlar deliğin İÇİNDE bırakılmıyor (maskeden çıkarılmıyor)."""
+        Tutamaçlar (köşe/kenar/taşı) genel kenar payından BAĞIMSIZ olarak
+        ayrıca maskeye geri ekleniyor - bu sayede genel kenar payını
+        minimuma indirip ince bir çerçeve elde edebiliyoruz, tutamaçlar
+        yine de tam çalışıyor."""
         if not self._crop.isValid():
             self.clearMask()
             return
-        # HANDLE (12px) tutamaçlarının tamamen tıklanabilir kalması için
-        # deliği tutamaç yarıçapından büyük bir miktarla içeri çekiyoruz.
-        inset = self.HANDLE
+        # Çerçevenin görsel kalınlığını belirleyen tek şey bu - ince bir
+        # çerçeve için minimumda tutuyoruz.
+        inset = 1
         hole = self._crop.adjusted(inset, inset, -inset, -inset)
         region = QRegion(self.rect())
         if hole.isValid() and hole.width() > 0 and hole.height() > 0:
             region = region.subtracted(QRegion(hole))
-        # Ortadaki "taşı" tutamacını her zaman pencerenin bir parçası
-        # (tıklanabilir/görünür) olarak geri ekle.
-        move_handle = self._handles().get("move")
-        if move_handle:
-            region = region.united(QRegion(move_handle))
+        # Tüm tutamaçları (köşe/kenar/taşı) - genel kenar payından bağımsız
+        # olarak - her zaman pencerenin bir parçası (tıklanabilir/görünür)
+        # olarak geri ekle.
+        for hr in self._handles().values():
+            region = region.united(QRegion(hr))
         self.setMask(region)
 
     def crop_ratio(self):
@@ -574,7 +676,7 @@ class CropOverlay(QWidget):
         # (maskelenmiş) alanı düz, opak koyu bir renkle dolduruyoruz.
         painter.fillRect(self.rect(), QColor(15, 15, 15, 235))
 
-        painter.setPen(QPen(QColor(255, 255, 255), 2))
+        painter.setPen(QPen(QColor(255, 255, 255), 1))
         painter.setBrush(Qt.NoBrush)
         painter.drawRect(self._crop)
 
@@ -860,11 +962,12 @@ class MusicIDWorker(QThread):
     finished_not_found = pyqtSignal()
     finished_err = pyqtSignal(str)
 
-    def __init__(self, path, seek_to, seconds=MUSIC_ID_READ_SECONDS):
+    def __init__(self, path, seek_to, seconds=MUSIC_ID_READ_SECONDS, do_rename=False):
         super().__init__()
         self.path = path
         self.seek_to = seek_to
         self.seconds = seconds
+        self.do_rename = do_rename
 
     def run(self):
         wav_path = None
@@ -885,7 +988,10 @@ class MusicIDWorker(QThread):
                 return
 
             artist, title = result["artist"], result["title"]
-            new_path = self._rename_file(self.path, artist, title)
+            if self.do_rename:
+                new_path = self._rename_file(self.path, artist, title)
+            else:
+                new_path = self.path
             self.finished_ok.emit(new_path, artist, title)
 
         except Exception as e:
@@ -1104,13 +1210,23 @@ class VideoStudioPlayer(QMainWindow):
 
         self.crop_overlay = CropOverlay()
 
+        # ---- "sinyal yok" logosu: video açılana kadar ortada duran, eski
+        # televizyonların UHF kanal arama ekranını andıran kırmızı piksel
+        # yazı. video_frame NATIVE bir pencere olduğu için (mpv buraya
+        # gömülüyor), sıradan bir QLabel bunun ÜZERİNDE hiç görünmez -
+        # CropOverlay'de olduğu gibi bunu da native yapıp raise_() ile üste
+        # çıkarmamız gerekiyor.
+        self.idle_logo = IdleSignalWidget()
+
         video_area = QGridLayout()
         video_area.setContentsMargins(0, 0, 0, 0)
         video_area.addWidget(self.video_frame, 0, 0)
         video_area.addWidget(self.crop_overlay, 0, 0)
+        video_area.addWidget(self.idle_logo, 0, 0)
         video_container = QWidget()
         video_container.setLayout(video_area)
         main_layout.addWidget(video_container, 1)
+        self.idle_logo.raise_()
 
         self.lbl_dim = QLabel(video_container)
         self.lbl_dim.setStyleSheet(
@@ -1191,16 +1307,52 @@ class VideoStudioPlayer(QMainWindow):
         self.music_id_btn = QPushButton("🎵")
         self.music_id_btn.setFixedWidth(40)
         self.music_id_btn.setToolTip(
-            "Şarkıyı Tanı (Shazam) ve Dosyayı Yeniden Adlandır\n"
+            "Şarkıyı Tanı (Shazam)\n"
             "Tanınamazsa dosyaya hiç dokunulmaz."
         )
         controls_layout.addWidget(self.music_id_btn)
+
+        self.chk_auto_rename = QCheckBox("✓")
+        self.chk_auto_rename.setChecked(False)
+        self.chk_auto_rename.setToolTip(
+            "Tanınınca dosyayı otomatik yeniden adlandır\n"
+            "(işaretli değilse sadece sonucu gösterir, dosyaya dokunmaz)"
+        )
+        controls_layout.addWidget(self.chk_auto_rename)
 
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(80)
         self.volume_slider.setMaximumWidth(150)
         controls_layout.addWidget(self.volume_slider)
+
+        self.btn_mono_l = QPushButton("L")
+        self.btn_mono_r = QPushButton("R")
+        self.btn_mono_l.setCheckable(True)
+        self.btn_mono_r.setCheckable(True)
+        self.btn_mono_l.setFixedWidth(28)
+        self.btn_mono_r.setFixedWidth(28)
+        self.btn_mono_l.setToolTip(
+            "Sol Kanalı Mono Yap\n"
+            "Sağ kanalda sorun varsa (parazit/sessiz), her iki hoparlörden "
+            "de SOL kanalın sesini dinlemenizi sağlar."
+        )
+        self.btn_mono_r.setToolTip(
+            "Sağ Kanalı Mono Yap\n"
+            "Sol kanalda sorun varsa (parazit/sessiz), her iki hoparlörden "
+            "de SAĞ kanalın sesini dinlemenizi sağlar."
+        )
+        self.btn_mono_l.setStyleSheet(
+            "QPushButton{background:transparent;border:1px solid #555;border-radius:4px;}"
+            "QPushButton:checked{background:#3a6ea5;border-color:#3a6ea5;}"
+        )
+        self.btn_mono_r.setStyleSheet(
+            "QPushButton{background:transparent;border:1px solid #555;border-radius:4px;}"
+            "QPushButton:checked{background:#3a6ea5;border-color:#3a6ea5;}"
+        )
+        controls_layout.addWidget(self.btn_mono_l)
+        controls_layout.addWidget(self.btn_mono_r)
+
         controls_layout.addStretch(1)
         controls_panel_layout.addLayout(controls_layout)
 
@@ -1290,6 +1442,8 @@ class VideoStudioPlayer(QMainWindow):
         self.play_btn.clicked.connect(self.toggle_play)
         self.screenshot_btn.clicked.connect(self.take_screenshot)
         self.music_id_btn.clicked.connect(self.identify_and_rename_track)
+        self.btn_mono_l.toggled.connect(self._on_mono_l_toggled)
+        self.btn_mono_r.toggled.connect(self._on_mono_r_toggled)
         self.volume_slider.valueChanged.connect(self.set_volume)
         self.seek_slider.sliderPressed.connect(self._seek_start)
         self.seek_slider.sliderReleased.connect(self._seek_end)
@@ -1319,7 +1473,8 @@ class VideoStudioPlayer(QMainWindow):
         tüm kontrol widget'larının klavye odağını kapatıyoruz."""
         for w in (
             self.btn_open, self.btn_pin, self.btn_min, self.btn_max, self.btn_close,
-            self.play_btn, self.screenshot_btn, self.music_id_btn, self.volume_slider,
+            self.play_btn, self.screenshot_btn, self.music_id_btn, self.chk_auto_rename,
+            self.btn_mono_l, self.btn_mono_r, self.volume_slider,
             self.seek_slider, self.audio_combo, self.subtitle_combo,
             self.subtitle_settings_btn, self.chk_rotate, self.radio_cw,
             self.radio_ccw, self.radio_180, self.chk_crop, self.chk_trim,
@@ -1356,12 +1511,16 @@ class VideoStudioPlayer(QMainWindow):
             self._pending_open_path = path
             return
         self.current_path = path
+        self.idle_logo.hide()
         self.native_w = self.native_h = None
         self.status_label.setText("")
         self.lbl_dim.hide()
         self.chk_trim.setChecked(False)
         self.trim_bar.hide()
         self.trim_bar.reset()
+        self.btn_mono_l.setChecked(False)
+        self.btn_mono_r.setChecked(False)
+        self._apply_audio_pan(None)
 
         try:
             self.player.command("loadfile", path, "replace")
@@ -1452,10 +1611,11 @@ class VideoStudioPlayer(QMainWindow):
 
     # ------------------------------------------------------- şarkı tanıma
     def identify_and_rename_track(self):
-        """Şu an açık olan dosyanın ortasından ~10 saniyelik ses alıp
-        Shazam ile tanımaya çalışır. Tanırsa dosyayı "Sanatçı - Şarkı"
-        olarak yeniden adlandırır; tanıyamazsa veya bir hata olursa
-        dosyaya HİÇ dokunmaz."""
+        """Şu an TIMELINE'DA NEREDEYSE (oynatma konumundan) ~10 saniyelik
+        ses alıp Shazam ile tanımaya çalışır. "Otomatik yeniden adlandır"
+        işaretliyse ve tanırsa dosyayı "Sanatçı - Şarkı" olarak yeniden
+        adlandırır; işaretli değilse sadece sonucu gösterir, dosyaya
+        dokunmaz. Tanıyamazsa veya bir hata olursa dosyaya HİÇ dokunmaz."""
         if not self.current_path:
             self.status_label.setText("Önce bir dosya açın.")
             return
@@ -1463,15 +1623,15 @@ class VideoStudioPlayer(QMainWindow):
             return  # zaten devam eden bir tanıma var
 
         try:
-            duration = self.player.duration
+            seek_to = self.player.time_pos or 0.0
         except Exception:
-            duration = None
-        seek_to = (duration / 2) if (duration and duration > 30) else 0
+            seek_to = 0.0
 
         self.music_id_btn.setEnabled(False)
         self.status_label.setText("🎵 Şarkı tanınıyor…")
 
-        self._music_id_worker = MusicIDWorker(self.current_path, seek_to)
+        do_rename = self.chk_auto_rename.isChecked()
+        self._music_id_worker = MusicIDWorker(self.current_path, seek_to, do_rename=do_rename)
         self._music_id_worker.finished_ok.connect(self._on_music_id_ok)
         self._music_id_worker.finished_not_found.connect(self._on_music_id_not_found)
         self._music_id_worker.finished_err.connect(self._on_music_id_err)
@@ -1482,13 +1642,18 @@ class VideoStudioPlayer(QMainWindow):
         self._music_id_worker = None
 
     def _on_music_id_ok(self, new_path, artist, title):
-        # Dosya zaten yeniden adlandırıldı; mpv aynı dosya tanıtıcısını
-        # (handle) kullanmaya devam ettiği için oynatma kesintiye
-        # uğramaz - sadece kendi takip ettiğimiz yolu ve pencere
-        # başlığını güncelliyoruz.
+        # Dosya yeniden adlandırıldıysa (auto-rename işaretliyse); mpv aynı
+        # dosya tanıtıcısını (handle) kullanmaya devam ettiği için oynatma
+        # kesintiye uğramaz - sadece kendi takip ettiğimiz yolu ve pencere
+        # başlığını güncelliyoruz. İşaretli değilse new_path == eski yol
+        # olur, bu satırlar zararsız birer no-op olur.
+        renamed = new_path != self.current_path
         self.current_path = new_path
         self.setWindowTitle(f"HuluMedia - {os.path.basename(new_path)}")
-        self.status_label.setText(f"✓ Tanındı: {artist} - {title}")
+        if renamed:
+            self.status_label.setText(f"✓ Tanındı ve yeniden adlandırıldı: {artist} - {title}")
+        else:
+            self.status_label.setText(f"✓ Tanındı: {artist} - {title}")
         self._music_id_cleanup()
 
     def _on_music_id_not_found(self):
@@ -1725,6 +1890,44 @@ class VideoStudioPlayer(QMainWindow):
     def adjust_volume(self, delta):
         new_value = max(0, min(100, self.volume_slider.value() + delta))
         self.volume_slider.setValue(new_value)
+
+    # ------------------------------------------------------------------ #
+    #  SOL/SAĞ KANAL MONO - bir kanalda sorun olduğunda (parazit/sessiz),
+    #  sağlam kanalı HER İKİ hoparlörden birden dinlemeyi sağlar. mpv'nin
+    #  "af" (audio filter) özelliğine ffmpeg'in "pan" filtresini vererek
+    #  yapılıyor. Tek bir "M" düğmesi değil iki ayrı düğme (L/R) olmasının
+    #  sebebi: hangi kanalın bozuk olduğunu önceden bilemiyoruz, kullanıcı
+    #  kulağıyla karar verip ilgili düğmeye basıyor.
+    # ------------------------------------------------------------------ #
+    def _on_mono_l_toggled(self, checked):
+        if checked:
+            self.btn_mono_r.setChecked(False)
+            self._apply_audio_pan("left")
+        elif not self.btn_mono_r.isChecked():
+            self._apply_audio_pan(None)
+
+    def _on_mono_r_toggled(self, checked):
+        if checked:
+            self.btn_mono_l.setChecked(False)
+            self._apply_audio_pan("right")
+        elif not self.btn_mono_l.isChecked():
+            self._apply_audio_pan(None)
+
+    def _apply_audio_pan(self, mode):
+        # mpv'nin kendi yerleşik filtre listesinde "pan" YOK - bu bir
+        # ffmpeg/libavfilter filtresi. mpv'de libavfilter filtrelerini
+        # kullanmak için "lavfi=[...]" sarmalayıcısı ŞART; bare "pan=..."
+        # mpv tarafından tanınmayan bir filtre adı olarak reddediliyordu
+        # (ve hatayı sessizce yutuyorduk, bu yüzden fark edilmemişti).
+        try:
+            if mode == "left":
+                self.player.af = "lavfi=[pan=stereo|c0=c0|c1=c0]"
+            elif mode == "right":
+                self.player.af = "lavfi=[pan=stereo|c0=c1|c1=c1]"
+            else:
+                self.player.af = ""
+        except Exception as e:
+            print("Mono ses filtresi uygulanamadı:", e)
 
     # ------------------------------------------------------------------ #
     #  DÖNDÜRME (gerçek zamanlı, mpv "video-rotate" ile)
