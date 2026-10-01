@@ -16,11 +16,12 @@ class SubtitleStreamInfo {
 }
 
 class AudioStreamInfo {
-  const AudioStreamInfo({required this.index, required this.codec});
+  const AudioStreamInfo({required this.index, required this.codec, this.channels});
 
   /// Absolute stream index, the same as mpv's `ff-index`.
   final int index;
   final String codec;
+  final int? channels;
 }
 
 class ProbeResult {
@@ -59,7 +60,10 @@ class ProbeResult {
     }
     final streams = (root['streams'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? const [];
     final format = root['format'] is Map<String, dynamic> ? root['format'] as Map<String, dynamic> : const {};
-    final video = streams.where((s) => s['codec_type'] == 'video').firstOrNull;
+    // Cover art in audio files is a one-picture "video" stream: not a picture.
+    final video = streams
+        .where((s) => s['codec_type'] == 'video' && !_isAttachedPicture(s))
+        .firstOrNull;
 
     return ProbeResult(
       videoBitRate: _positiveInt(video?['bit_rate']) ?? _positiveInt(format['bit_rate']),
@@ -80,7 +84,11 @@ class ProbeResult {
       audioStreams: [
         for (final s in streams)
           if (s['codec_type'] == 'audio' && s['index'] is int)
-            AudioStreamInfo(index: s['index'] as int, codec: '${s['codec_name'] ?? ''}'),
+            AudioStreamInfo(
+              index: s['index'] as int,
+              codec: '${s['codec_name'] ?? ''}',
+              channels: _positiveInt(s['channels']),
+            ),
       ],
     );
   }
@@ -90,10 +98,36 @@ class ProbeResult {
     return (parsed != null && parsed > 0) ? parsed : null;
   }
 
+  static bool _isAttachedPicture(Map<String, dynamic> stream) {
+    final disposition = stream['disposition'];
+    return disposition is Map && disposition['attached_pic'] == 1;
+  }
+
+  /// Upright picture size. Phones store landscape pixels plus a rotation;
+  /// ffmpeg auto-rotates its input and mpv shows it upright, so a quarter
+  /// turn swaps the stored width and height.
   static IntSize? _size(Map<String, dynamic>? video) {
     final w = _positiveInt(video?['width']);
     final h = _positiveInt(video?['height']);
-    return (w == null || h == null) ? null : IntSize(w, h);
+    if (w == null || h == null) return null;
+    return _rotation(video!) % 180 == 90 ? IntSize(h, w) : IntSize(w, h);
+  }
+
+  /// Display rotation in degrees, from the display matrix (ffmpeg 5+) or the
+  /// old `rotate` tag; normalised to 0..359.
+  static int _rotation(Map<String, dynamic> video) {
+    num? degrees;
+    final sideData = video['side_data_list'];
+    if (sideData is List) {
+      for (final item in sideData.whereType<Map<String, dynamic>>()) {
+        final r = item['rotation'];
+        if (r is num) degrees = r;
+      }
+    }
+    final tags = video['tags'];
+    if (degrees == null && tags is Map) degrees = num.tryParse('${tags['rotate'] ?? ''}');
+    if (degrees == null) return 0;
+    return degrees.round() % 360;
   }
 
   static FieldOrder _fieldOrder(Object? v) {
