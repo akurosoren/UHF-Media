@@ -119,4 +119,95 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get startupFailed => 'UHF Media could not start.';
+
+  @override
+  String get tooltipStudio => 'Studio (E)';
+
+  @override
+  String get studioTrim => 'Trim';
+
+  @override
+  String get studioIn => 'In';
+
+  @override
+  String get studioOut => 'Out';
+
+  @override
+  String get tooltipCrop => 'Crop (C)';
+
+  @override
+  String get cropOff => 'Off';
+
+  @override
+  String get cropFree => 'Free';
+
+  @override
+  String get actionExport => 'Export';
+
+  @override
+  String exportRemaining(String time) {
+    return '$time left';
+  }
+
+  @override
+  String get toastExportDone => 'Export finished';
+
+  @override
+  String get toastExportCancelled => 'Export cancelled';
+
+  @override
+  String get toastExportFailed => 'The export failed';
+
+  @override
+  String get actionCopyDetails => 'Copy details';
+
+  @override
+  String get toastExportRetryCpu =>
+      'Hardware encoding failed, retrying on the CPU';
+
+  @override
+  String get toastNoChanges => 'Choose a rotation, a crop or a trim first';
+
+  @override
+  String get toastTrimTooShort => 'The trim is too short';
+
+  @override
+  String get toastCropTooSmall => 'The crop is too small';
+
+  @override
+  String toastFfmpegMissing(String folder) {
+    return 'ffmpeg is missing: put ffmpeg.exe and ffprobe.exe in $folder';
+  }
+
+  @override
+  String get menuIdentifyMusic => 'Identify music';
+
+  @override
+  String get menuAutoRename => 'Rename automatically after identification';
+
+  @override
+  String get toastListening => 'Listening…';
+
+  @override
+  String get toastMusicNotFound => 'No song recognized';
+
+  @override
+  String get toastMusicFailed => 'Identification failed; check your connection';
+
+  @override
+  String get actionRenameFile => 'Rename the file';
+
+  @override
+  String get actionCopy => 'Copy';
+
+  @override
+  String get actionUndo => 'Undo';
+
+  @override
+  String toastRenamed(String name) {
+    return 'Renamed to $name';
+  }
+
+  @override
+  String get toastRenameFailed => 'Couldn\'t rename the file';
 }

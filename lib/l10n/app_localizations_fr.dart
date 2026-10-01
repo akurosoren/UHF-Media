@@ -119,4 +119,97 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get startupFailed => 'UHF Media n\'a pas pu démarrer.';
+
+  @override
+  String get tooltipStudio => 'Studio (E)';
+
+  @override
+  String get studioTrim => 'Découpe';
+
+  @override
+  String get studioIn => 'Entrée';
+
+  @override
+  String get studioOut => 'Sortie';
+
+  @override
+  String get tooltipCrop => 'Cadre (C)';
+
+  @override
+  String get cropOff => 'Désactivé';
+
+  @override
+  String get cropFree => 'Libre';
+
+  @override
+  String get actionExport => 'Exporter';
+
+  @override
+  String exportRemaining(String time) {
+    return 'reste $time';
+  }
+
+  @override
+  String get toastExportDone => 'Export terminé';
+
+  @override
+  String get toastExportCancelled => 'Export annulé';
+
+  @override
+  String get toastExportFailed => 'L\'export a échoué';
+
+  @override
+  String get actionCopyDetails => 'Copier le détail';
+
+  @override
+  String get toastExportRetryCpu =>
+      'L\'encodage matériel a échoué, nouvel essai sur le processeur';
+
+  @override
+  String get toastNoChanges =>
+      'Choisis d\'abord une rotation, un cadre ou une découpe';
+
+  @override
+  String get toastTrimTooShort => 'La découpe est trop courte';
+
+  @override
+  String get toastCropTooSmall => 'Le cadre est trop petit';
+
+  @override
+  String toastFfmpegMissing(String folder) {
+    return 'ffmpeg est introuvable : place ffmpeg.exe et ffprobe.exe dans $folder';
+  }
+
+  @override
+  String get menuIdentifyMusic => 'Identifier la musique';
+
+  @override
+  String get menuAutoRename => 'Renommer automatiquement après identification';
+
+  @override
+  String get toastListening => 'Écoute en cours…';
+
+  @override
+  String get toastMusicNotFound => 'Aucun morceau reconnu';
+
+  @override
+  String get toastMusicFailed =>
+      'L\'identification a échoué ; vérifie ta connexion';
+
+  @override
+  String get actionRenameFile => 'Renommer le fichier';
+
+  @override
+  String get actionCopy => 'Copier';
+
+  @override
+  String get actionUndo => 'Annuler';
+
+  @override
+  String toastRenamed(String name) {
+    return 'Renommé en $name';
+  }
+
+  @override
+  String get toastRenameFailed => 'Impossible de renommer le fichier';
 }

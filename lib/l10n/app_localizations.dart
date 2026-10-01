@@ -315,6 +315,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'UHF Media could not start.'**
   String get startupFailed;
+
+  /// No description provided for @tooltipStudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Studio (E)'**
+  String get tooltipStudio;
+
+  /// No description provided for @studioTrim.
+  ///
+  /// In en, this message translates to:
+  /// **'Trim'**
+  String get studioTrim;
+
+  /// No description provided for @studioIn.
+  ///
+  /// In en, this message translates to:
+  /// **'In'**
+  String get studioIn;
+
+  /// No description provided for @studioOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Out'**
+  String get studioOut;
+
+  /// No description provided for @tooltipCrop.
+  ///
+  /// In en, this message translates to:
+  /// **'Crop (C)'**
+  String get tooltipCrop;
+
+  /// No description provided for @cropOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get cropOff;
+
+  /// No description provided for @cropFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get cropFree;
+
+  /// No description provided for @actionExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get actionExport;
+
+  /// No description provided for @exportRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{time} left'**
+  String exportRemaining(String time);
+
+  /// No description provided for @toastExportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Export finished'**
+  String get toastExportDone;
+
+  /// No description provided for @toastExportCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Export cancelled'**
+  String get toastExportCancelled;
+
+  /// No description provided for @toastExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The export failed'**
+  String get toastExportFailed;
+
+  /// No description provided for @actionCopyDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy details'**
+  String get actionCopyDetails;
+
+  /// No description provided for @toastExportRetryCpu.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware encoding failed, retrying on the CPU'**
+  String get toastExportRetryCpu;
+
+  /// No description provided for @toastNoChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a rotation, a crop or a trim first'**
+  String get toastNoChanges;
+
+  /// No description provided for @toastTrimTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'The trim is too short'**
+  String get toastTrimTooShort;
+
+  /// No description provided for @toastCropTooSmall.
+  ///
+  /// In en, this message translates to:
+  /// **'The crop is too small'**
+  String get toastCropTooSmall;
+
+  /// No description provided for @toastFfmpegMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'ffmpeg is missing: put ffmpeg.exe and ffprobe.exe in {folder}'**
+  String toastFfmpegMissing(String folder);
+
+  /// No description provided for @menuIdentifyMusic.
+  ///
+  /// In en, this message translates to:
+  /// **'Identify music'**
+  String get menuIdentifyMusic;
+
+  /// No description provided for @menuAutoRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename automatically after identification'**
+  String get menuAutoRename;
+
+  /// No description provided for @toastListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening…'**
+  String get toastListening;
+
+  /// No description provided for @toastMusicNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No song recognized'**
+  String get toastMusicNotFound;
+
+  /// No description provided for @toastMusicFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Identification failed; check your connection'**
+  String get toastMusicFailed;
+
+  /// No description provided for @actionRenameFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename the file'**
+  String get actionRenameFile;
+
+  /// No description provided for @actionCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get actionCopy;
+
+  /// No description provided for @actionUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get actionUndo;
+
+  /// No description provided for @toastRenamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Renamed to {name}'**
+  String toastRenamed(String name);
+
+  /// No description provided for @toastRenameFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t rename the file'**
+  String get toastRenameFailed;
 }
 
 class _AppLocalizationsDelegate

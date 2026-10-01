@@ -119,4 +119,95 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get startupFailed => 'UHF Media başlatılamadı.';
+
+  @override
+  String get tooltipStudio => 'Stüdyo (E)';
+
+  @override
+  String get studioTrim => 'Kesme';
+
+  @override
+  String get studioIn => 'Başlangıç';
+
+  @override
+  String get studioOut => 'Bitiş';
+
+  @override
+  String get tooltipCrop => 'Kırpma (C)';
+
+  @override
+  String get cropOff => 'Kapalı';
+
+  @override
+  String get cropFree => 'Serbest';
+
+  @override
+  String get actionExport => 'Dışa aktar';
+
+  @override
+  String exportRemaining(String time) {
+    return '$time kaldı';
+  }
+
+  @override
+  String get toastExportDone => 'Dışa aktarma tamamlandı';
+
+  @override
+  String get toastExportCancelled => 'Dışa aktarma iptal edildi';
+
+  @override
+  String get toastExportFailed => 'Dışa aktarma başarısız oldu';
+
+  @override
+  String get actionCopyDetails => 'Ayrıntıyı kopyala';
+
+  @override
+  String get toastExportRetryCpu =>
+      'Donanım kodlama başarısız oldu, işlemciyle yeniden deneniyor';
+
+  @override
+  String get toastNoChanges => 'Önce bir döndürme, kırpma ya da kesme seç';
+
+  @override
+  String get toastTrimTooShort => 'Kesme aralığı çok kısa';
+
+  @override
+  String get toastCropTooSmall => 'Kırpma alanı çok küçük';
+
+  @override
+  String toastFfmpegMissing(String folder) {
+    return 'ffmpeg bulunamadı: ffmpeg.exe ve ffprobe.exe dosyalarını $folder klasörüne koy';
+  }
+
+  @override
+  String get menuIdentifyMusic => 'Müziği tanı';
+
+  @override
+  String get menuAutoRename => 'Tanımadan sonra otomatik yeniden adlandır';
+
+  @override
+  String get toastListening => 'Dinleniyor…';
+
+  @override
+  String get toastMusicNotFound => 'Şarkı tanınamadı';
+
+  @override
+  String get toastMusicFailed => 'Tanıma başarısız oldu; bağlantını kontrol et';
+
+  @override
+  String get actionRenameFile => 'Dosyayı yeniden adlandır';
+
+  @override
+  String get actionCopy => 'Kopyala';
+
+  @override
+  String get actionUndo => 'Geri al';
+
+  @override
+  String toastRenamed(String name) {
+    return '$name olarak yeniden adlandırıldı';
+  }
+
+  @override
+  String get toastRenameFailed => 'Dosya yeniden adlandırılamadı';
 }
