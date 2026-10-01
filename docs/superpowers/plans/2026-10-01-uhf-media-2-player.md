@@ -1920,7 +1920,7 @@ void main() {
   test('screenshot writes to the desktop with a timestamped name', () async {
     final c = make();
     await c.screenshot();
-    expect(engine.calls, isEmpty);
+    expect(engine.calls.where((x) => x.startsWith('screenshot')), isEmpty);
     await c.open(r'C:\v\a.mkv');
     await c.screenshot();
     await settle();
@@ -1930,6 +1930,7 @@ void main() {
 
   test('subtitle preview does not persist; commit does', () async {
     final c = make();
+    engine.calls.clear();
     await c.previewSubtitleStyle(150, 80);
     expect(c.subtitleScale, 100);
     expect(engine.calls, ['sub-scale 150', 'sub-pos 80']);
@@ -2945,6 +2946,7 @@ git commit -m "feat(shell): add title bar with drawn window buttons"
 - [ ] **Step 1: Écrire le test**
 
 ```dart
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uhf_media/features/player/timeline.dart';
@@ -3602,7 +3604,9 @@ void main() {
       v.poke();
       await tester.pump(const Duration(milliseconds: 150));
       await tester.pumpAndSettle();
-      final opacity = tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity));
+      final opacity = tester.widget<AnimatedOpacity>(
+        find.descendant(of: find.byKey(const Key('controls-ignore')), matching: find.byType(AnimatedOpacity)).first,
+      );
       expect(opacity.opacity, 0);
       expect(tester.widget<IgnorePointer>(find.byKey(const Key('controls-ignore'))).ignoring, isTrue);
       v.dispose();
@@ -3868,6 +3872,12 @@ void main() {
   });
   tearDown(() => dir.deleteSync(recursive: true));
 
+  // IdleScreen and ToastController own timers: dispose them before the test ends.
+  Future<void> finish(WidgetTester tester) async {
+    await tester.pumpWidget(const SizedBox());
+    toasts.dispose();
+  }
+
   Widget app() => harness(AppShell(
         player: player,
         shell: shell,
@@ -3886,6 +3896,7 @@ void main() {
     expect(find.byKey(const Key('video')), findsOneWidget);
     expect(find.text('a.mkv'), findsOneWidget);
     expect(host.calls, contains('title a.mkv — UHF Media'));
+    await finish(tester);
   });
 
   testWidgets('Ctrl+O opens the picked file and remembers its folder', (tester) async {
@@ -3897,6 +3908,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(engine.calls, contains(r'open C:\Films\b.mkv'));
     expect(settings.value.lastOpenDir, r'C:\Films');
+    await finish(tester);
   });
 
   testWidgets('playback shortcuts still work after clicking a control (review focus 3)', (tester) async {
@@ -3924,6 +3936,7 @@ void main() {
       'mute no',
       'frame-step',
     ]);
+    await finish(tester);
   });
 
   testWidgets('F and Esc drive fullscreen, Ctrl+T pins', (tester) async {
@@ -3936,6 +3949,7 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pump();
     expect(host.calls, containsAllInOrder(['fullscreen true', 'fullscreen false', 'top true']));
+    await finish(tester);
   });
 
   testWidgets('screenshot shows a toast that reveals the file', (tester) async {
@@ -3947,6 +3961,7 @@ void main() {
     expect(find.text('Screenshot saved'), findsOneWidget);
     await tester.tap(find.text('Show'));
     expect(revealed, [r'D:\Desk\UHF_20261001_090507.png']);
+    await finish(tester);
   });
 
   testWidgets('a failed open shows a toast and stays idle', (tester) async {
@@ -3956,6 +3971,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text("Couldn't open this file"), findsOneWidget);
     expect(find.byType(IdleScreen), findsOneWidget);
+    await finish(tester);
   });
 
   test('dropped paths: first media opens, subtitles need an open video (review focus 2)', () async {
