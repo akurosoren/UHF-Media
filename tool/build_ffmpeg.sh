@@ -24,7 +24,7 @@ cd "$src"
   --disable-encoders \
   --enable-encoder=libx264,h264_nvenc,h264_qsv,h264_amf,aac,flac,movtext,pcm_s16le \
   --disable-muxers \
-  --enable-muxer=mp4,mov,ipod,matroska,null,s16le \
+  --enable-muxer=mp4,mov,ipod,matroska,null,pcm_s16le \
   --disable-filters \
   --enable-filter=crop,transpose,hflip,vflip,yadif,format,scale,fps,setpts,trim,null \
   --enable-filter=aresample,aformat,asetpts,atrim,anull,color,buffer,buffersink,abuffer,abuffersink \
