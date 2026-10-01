@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import 'package:uhf_media/ui/icons.dart';
 import 'package:uhf_media/ui/theme.dart';
 import 'package:uhf_media/ui/toast.dart';
 import 'package:uhf_media/ui/tokens.dart';
@@ -13,7 +13,7 @@ void main() {
   testWidgets('icon button taps, shows its tooltip and never takes focus', (tester) async {
     var taps = 0;
     await tester.pumpWidget(harness(Center(
-      child: UhfIconButton(icon: Symbols.play_arrow_sharp, tooltip: 'Play', onPressed: () => taps++),
+      child: UhfIconButton(icon: UhfIcons.play_arrow, tooltip: 'Play', onPressed: () => taps++),
     )));
     await tester.tap(find.byType(UhfIconButton));
     expect(taps, 1);
@@ -23,7 +23,7 @@ void main() {
 
   testWidgets('active icon button uses the signal colour', (tester) async {
     await tester.pumpWidget(harness(Center(
-      child: UhfIconButton(icon: Symbols.push_pin_sharp, tooltip: 'Pin', onPressed: () {}, active: true),
+      child: UhfIconButton(icon: UhfIcons.push_pin, tooltip: 'Pin', onPressed: () {}, active: true),
     )));
     expect(tester.widget<Icon>(find.byType(Icon)).color, UhfColors.signal);
   });
@@ -32,7 +32,7 @@ void main() {
     String? picked;
     await tester.pumpWidget(harness(Center(
       child: UhfMenuButton(
-        icon: Symbols.subtitles_sharp,
+        icon: UhfIcons.subtitles,
         tooltip: 'Subtitles',
         entries: [
           UhfMenuEntry(label: 'Off', checked: true, onSelected: () => picked = 'off'),
@@ -42,7 +42,7 @@ void main() {
     )));
     await tester.tap(find.byType(UhfIconButton));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Symbols.check_sharp), findsOneWidget);
+    expect(find.byIcon(UhfIcons.check), findsOneWidget);
     await tester.tap(find.text('ENG'));
     await tester.pumpAndSettle();
     expect(picked, 'eng');

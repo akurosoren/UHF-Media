@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import '../../ui/icons.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../ui/tokens.dart';
@@ -58,7 +58,7 @@ class MusicResultCard extends StatelessWidget {
                     ),
                   ),
                   UhfIconButton(
-                    icon: Symbols.close_sharp,
+                    icon: UhfIcons.close,
                     tooltip: l.tooltipClose,
                     size: 24,
                     iconSize: 16,

@@ -17,7 +17,6 @@ dependencies:
     sdk: flutter
   http: ^1.6.0
   intl: any
-  material_symbols_icons: ^4.2960.0
   media_kit: ^1.2.6
   media_kit_libs_video: ^1.0.7
   media_kit_video: ^2.0.1
@@ -30,11 +29,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Source of the icon glyphs for tool/subset_icons.py; its fonts are not bundled.
+  material_symbols_icons: ^4.2960.0
 
 flutter:
   uses-material-design: true
   generate: true
   fonts:
+    - family: UhfIcons
+      fonts:
+        - asset: assets/fonts/UhfIcons.ttf
     - family: IBMPlexSans
       fonts:
         - asset: assets/fonts/IBMPlexSans-Variable.ttf

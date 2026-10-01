@@ -294,7 +294,7 @@ packages:
     source: hosted
     version: "0.13.0"
   material_symbols_icons:
-    dependency: "direct main"
+    dependency: "direct dev"
     description:
       name: material_symbols_icons
       sha256: bd513edc2bc9b034108d5518c48cf5cebbb67d0653728cc452368cb27ca80bb0

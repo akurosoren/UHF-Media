@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import 'icons.dart';
 
 import 'tokens.dart';
 import 'typography.dart';
@@ -60,7 +60,7 @@ class UhfMenuButton extends StatelessWidget {
           ? null
           : SizedBox(
               width: 18,
-              child: checked ? const Icon(Symbols.check_sharp, size: 16, weight: 300) : null,
+              child: checked ? const Icon(UhfIcons.check, size: 16, weight: 300) : null,
             ),
       trailingIcon: e.shortcut == null
           ? null

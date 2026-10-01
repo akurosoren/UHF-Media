@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import '../../ui/icons.dart';
 
 import '../../core/util/time_format.dart';
 import '../../l10n/app_localizations.dart';
@@ -63,7 +63,7 @@ class ControlsOverlay extends StatelessWidget {
                   Row(
                     children: [
                       UhfIconButton(
-                        icon: player.playing ? Symbols.pause_sharp : Symbols.play_arrow_sharp,
+                        icon: player.playing ? UhfIcons.pause : UhfIcons.play_arrow,
                         tooltip: player.playing ? l.tooltipPause : l.tooltipPlay,
                         onPressed: player.togglePlay,
                       ),
@@ -76,20 +76,20 @@ class ControlsOverlay extends StatelessWidget {
                       const SizedBox(width: 6),
                       if (player.audioTracks.length > 1)
                         UhfMenuButton(
-                          icon: Symbols.audiotrack_sharp,
+                          icon: UhfIcons.audiotrack,
                           tooltip: l.tooltipAudioTrack,
                           entries: audioMenuEntries(player, l),
                           onOpenChanged: onMenuOpenChanged,
                         ),
                       UhfMenuButton(
-                        icon: Symbols.subtitles_sharp,
+                        icon: UhfIcons.subtitles,
                         tooltip: l.tooltipSubtitles,
                         active: player.selectedSubtitleId != null,
                         entries: subtitleMenuEntries(player, l),
                         onOpenChanged: onMenuOpenChanged,
                       ),
                       UhfMenuButton(
-                        icon: Symbols.more_horiz_sharp,
+                        icon: UhfIcons.more_horiz,
                         tooltip: l.tooltipMore,
                         entries: moreMenuEntries(
                           player: player,
@@ -103,13 +103,13 @@ class ControlsOverlay extends StatelessWidget {
                       ),
                       if (studio != null)
                         UhfIconButton(
-                          icon: Symbols.movie_edit_sharp,
+                          icon: UhfIcons.movie_edit,
                           tooltip: l.tooltipStudio,
                           active: studio.isOpen,
                           onPressed: studio.available ? studio.toggle : null,
                         ),
                       UhfIconButton(
-                        icon: shell.fullscreen ? Symbols.fullscreen_exit_sharp : Symbols.fullscreen_sharp,
+                        icon: shell.fullscreen ? UhfIcons.fullscreen_exit : UhfIcons.fullscreen,
                         tooltip: shell.fullscreen ? l.tooltipExitFullscreen : l.tooltipFullscreen,
                         onPressed: shell.toggleFullscreen,
                       ),

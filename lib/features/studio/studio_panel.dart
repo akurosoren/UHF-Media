@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import '../../ui/icons.dart';
 
 import '../../core/geometry/aspect_preset.dart';
 import '../../core/geometry/rotation.dart';
@@ -88,14 +88,14 @@ class _EditRow extends StatelessWidget {
         ],
         const SizedBox(width: 8),
         UhfChip(
-          icon: Symbols.content_cut_sharp,
+          icon: UhfIcons.content_cut,
           label: l.studioTrim,
           selected: studio.trimEnabled,
           onPressed: studio.toggleTrim,
         ),
         const SizedBox(width: 4),
         UhfMenuButton(
-          icon: Symbols.crop_sharp,
+          icon: UhfIcons.crop,
           tooltip: l.tooltipCrop,
           active: studio.cropEnabled,
           onOpenChanged: onMenuOpenChanged,
@@ -143,14 +143,14 @@ class _TrimRow extends StatelessWidget {
         Text(l.studioIn, style: label),
         const SizedBox(width: 6),
         Text(formatTimecode(trim.start), style: UhfText.mono(size: 12)),
-        nudge(Symbols.remove_sharp, '−1 s', () => studio.nudgeStart(-1)),
-        nudge(Symbols.add_sharp, '+1 s', () => studio.nudgeStart(1)),
+        nudge(UhfIcons.remove, '−1 s', () => studio.nudgeStart(-1)),
+        nudge(UhfIcons.add, '+1 s', () => studio.nudgeStart(1)),
         const SizedBox(width: 16),
         Text(l.studioOut, style: label),
         const SizedBox(width: 6),
         Text(formatTimecode(trim.end), style: UhfText.mono(size: 12)),
-        nudge(Symbols.remove_sharp, '−1 s', () => studio.nudgeEnd(-1)),
-        nudge(Symbols.add_sharp, '+1 s', () => studio.nudgeEnd(1)),
+        nudge(UhfIcons.remove, '−1 s', () => studio.nudgeEnd(-1)),
+        nudge(UhfIcons.add, '+1 s', () => studio.nudgeEnd(1)),
         const Spacer(),
         Text(formatTimecode(trim.length), style: UhfText.mono(size: 12, color: UhfColors.textMuted)),
       ],

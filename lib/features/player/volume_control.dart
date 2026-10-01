@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import '../../ui/icons.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../ui/uhf_icon_button.dart';
@@ -18,7 +18,7 @@ class VolumeControl extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         UhfIconButton(
-          icon: silent ? Symbols.volume_off_sharp : Symbols.volume_up_sharp,
+          icon: silent ? UhfIcons.volume_off : UhfIcons.volume_up,
           tooltip: player.muted ? l.tooltipUnmute : l.tooltipMute,
           onPressed: player.toggleMute,
         ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
+import '../../ui/icons.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../ui/tokens.dart';
@@ -31,7 +31,7 @@ class TitleBar extends StatelessWidget {
           children: [
             const SizedBox(width: 4),
             UhfIconButton(
-              icon: Symbols.folder_open_sharp,
+              icon: UhfIcons.folder_open,
               tooltip: l.tooltipOpen,
               onPressed: onOpen,
               size: 28,
@@ -52,7 +52,7 @@ class TitleBar extends StatelessWidget {
               ),
             ),
             UhfIconButton(
-              icon: Symbols.push_pin_sharp,
+              icon: UhfIcons.push_pin,
               tooltip: l.tooltipPin,
               onPressed: shell.toggleAlwaysOnTop,
               active: shell.alwaysOnTop,
