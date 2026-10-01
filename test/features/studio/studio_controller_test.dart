@@ -93,6 +93,31 @@ void main() {
     expect(studio.isOpen, isTrue);
   });
 
+  test('an audio file with cover art has no studio, even when mpv reports its size (final review)', () async {
+    player = PlayerController(
+      engine: engine,
+      resume: ResumeStore(dir),
+      probe: probeOf([
+        {'index': 0, 'codec_type': 'audio', 'codec_name': 'mp3'},
+        {
+          'index': 1,
+          'codec_type': 'video',
+          'codec_name': 'mjpeg',
+          'width': 500,
+          'height': 500,
+          'disposition': {'attached_pic': 1},
+        },
+      ]),
+      fileExists: (_) => true,
+    );
+    final withCover = StudioController(player: player, exporter: exporter);
+    await player.open(r'C:\m\song.mp3');
+    engine.emitDuration(const Duration(minutes: 3));
+    engine.emitVideoSize(const IntSize(500, 500));
+    await settle();
+    expect(withCover.available, isFalse);
+  });
+
   test('rotation goes through the player and cycles', () async {
     await openVideo(r'C:\v\a.mkv');
     await studio.cycleRotation();

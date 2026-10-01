@@ -91,8 +91,13 @@ class StudioController extends ChangeNotifier {
   bool get exporting => _export != null;
   ExportProgress? get exportProgress => _export;
 
-  /// Unrotated picture size: ffprobe's coded size, else the engine's.
-  IntSize? get _sourceSize => _player.probe?.videoSize ?? _player.videoSize;
+  /// Upright picture size from ffprobe; the engine's size only while there
+  /// is no probe (ffprobe missing or still running). ffprobe decides when it
+  /// answered: mpv also reports a size for an mp3's cover art.
+  IntSize? get _sourceSize {
+    final probe = _player.probe;
+    return probe != null ? probe.videoSize : _player.videoSize;
+  }
 
   /// A file with a picture is open (audio files have no studio).
   bool get available => _player.hasMedia && _sourceSize != null;
