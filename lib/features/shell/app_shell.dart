@@ -14,6 +14,8 @@ import '../../core/util/time_format.dart';
 import '../../l10n/app_localizations.dart';
 import '../../ui/tokens.dart';
 import '../../ui/toast.dart';
+import '../music_id/music_id_controller.dart';
+import '../music_id/music_result_card.dart';
 import '../player/controls_overlay.dart';
 import '../player/controls_visibility.dart';
 import '../player/player_controller.dart';
@@ -47,6 +49,7 @@ class AppShell extends StatefulWidget {
     required this.pickFile,
     required this.revealFile,
     this.studio,
+    this.music,
   });
 
   final PlayerController player;
@@ -57,6 +60,7 @@ class AppShell extends StatefulWidget {
   final Future<String?> Function(String? initialDirectory) pickFile;
   final void Function(String path) revealFile;
   final StudioController? studio;
+  final MusicIdController? music;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -68,6 +72,7 @@ class _AppShellState extends State<AppShell> {
   // Under the video in the studio: always shown.
   final _studioVisibility = ControlsVisibility();
   StreamSubscription<StudioEvent>? _studioEvents;
+  StreamSubscription<MusicEvent>? _musicEvents;
 
   StudioController? get _studio => widget.studio;
   bool get _studioOpen => _studio?.isOpen ?? false;
@@ -84,12 +89,14 @@ class _AppShellState extends State<AppShell> {
     _events = _player.events.listen(_onEvent);
     _player.addListener(_onPlayerChanged);
     _studioEvents = _studio?.events.listen(_onStudioEvent);
+    _musicEvents = widget.music?.events.listen(_onMusicEvent);
   }
 
   @override
   void dispose() {
     unawaited(_events.cancel());
     unawaited(_studioEvents?.cancel());
+    unawaited(_musicEvents?.cancel());
     _studioVisibility.dispose();
     _player.removeListener(_onPlayerChanged);
     _visibility.dispose();
@@ -157,6 +164,19 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  void _onMusicEvent(MusicEvent event) {
+    if (!mounted) return;
+    final l = AppLocalizations.of(context);
+    widget.toasts.show(switch (event) {
+      MusicListeningEvent() => l.toastListening,
+      MusicNotFoundEvent() => l.toastMusicNotFound,
+      MusicFailedEvent() => l.toastMusicFailed,
+      MusicRenamedEvent(:final name) => l.toastRenamed(name),
+      MusicRenameFailedEvent() => l.toastRenameFailed,
+      MusicUnavailableEvent(:final folder) => l.toastFfmpegMissing(folder),
+    });
+  }
+
   void _inStudio(void Function(StudioController studio) action) {
     final studio = _studio;
     if (studio != null && studio.isOpen) action(studio);
@@ -190,6 +210,7 @@ class _AppShellState extends State<AppShell> {
     const SingleActivator(LogicalKeyboardKey.keyR, includeRepeats: false): () => _inStudio((s) => s.cycleRotation()),
     const SingleActivator(LogicalKeyboardKey.keyC, includeRepeats: false): () => _inStudio((s) => s.toggleCrop()),
     const SingleActivator(LogicalKeyboardKey.keyE, control: true): () => _inStudio((s) => s.export()),
+    const SingleActivator(LogicalKeyboardKey.keyI, control: true): () => widget.music?.identify(),
   };
 
   @override
@@ -223,6 +244,7 @@ class _AppShellState extends State<AppShell> {
                           visibility: _studioVisibility,
                           onMenuOpenChanged: _onMenuOpenChanged,
                           studio: studio,
+                          music: widget.music,
                         ),
                         StudioPanel(studio: studio, player: _player, onMenuOpenChanged: _onMenuOpenChanged),
                       ],
@@ -270,6 +292,16 @@ class _AppShellState extends State<AppShell> {
                 visibility: _visibility,
                 onMenuOpenChanged: _onMenuOpenChanged,
                 studio: studio,
+                music: widget.music,
+              ),
+            ),
+          if (widget.music != null)
+            Positioned(
+              left: 14,
+              bottom: 140,
+              child: MusicResultCard(
+                music: widget.music!,
+                onCopy: (text) => Clipboard.setData(ClipboardData(text: text)),
               ),
             ),
           ToastHost(controller: widget.toasts),

@@ -15,11 +15,14 @@ import 'core/files/media_files.dart';
 import 'core/media/media_kit_engine.dart';
 import 'core/settings/resume_store.dart';
 import 'core/settings/settings_store.dart';
+import 'core/shazam/shazam_client.dart';
 import 'core/system/export_service.dart';
 import 'core/system/ffmpeg_locator.dart';
 import 'core/system/known_folders.dart';
 import 'core/system/launch_args.dart';
+import 'core/system/music_recognizer.dart';
 import 'core/system/probe_service.dart';
+import 'features/music_id/music_id_controller.dart';
 import 'features/player/player_controller.dart';
 import 'features/player/player_settings_binding.dart';
 import 'features/settings/settings_controller.dart';
@@ -80,6 +83,15 @@ Future<void> _start(List<String> args) async {
     player: player,
     exporter: ExportService(ffmpegPath: locator.locate('ffmpeg'), expectedFolder: locator.executableDir),
   );
+  final music = MusicIdController(
+    player: player,
+    identifier: MusicRecognizer(
+      ffmpegPath: locator.locate('ffmpeg'),
+      expectedFolder: locator.executableDir,
+      client: ShazamClient(),
+    ),
+    settings: settings,
+  );
   final shell = ShellController(host, settings);
   final toasts = ToastController();
   bindPlayerSettings(player, settings);
@@ -99,6 +111,7 @@ Future<void> _start(List<String> args) async {
         settings: settings,
         toasts: toasts,
         studio: studio,
+        music: music,
         videoBuilder: (_) => Video(
           controller: engine.controller,
           controls: null,

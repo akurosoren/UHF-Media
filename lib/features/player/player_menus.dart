@@ -4,6 +4,7 @@ import '../../core/media/pan_mode.dart';
 import '../../core/media/track_info.dart';
 import '../../l10n/app_localizations.dart';
 import '../../ui/uhf_menu.dart';
+import '../music_id/music_id_controller.dart';
 import '../settings/settings_controller.dart';
 import '../shell/shell_controller.dart';
 import 'player_controller.dart';
@@ -11,19 +12,19 @@ import 'player_controller.dart';
 String _trackLabel(TrackInfo t, AppLocalizations l) => t.label ?? l.trackNumber(t.id);
 
 List<UhfMenuEntry> audioMenuEntries(PlayerController player, AppLocalizations l) => [
-      for (final t in player.audioTracks)
-        UhfMenuEntry(label: _trackLabel(t, l), checked: t.selected, onSelected: () => player.selectAudio(t.id)),
-    ];
+  for (final t in player.audioTracks)
+    UhfMenuEntry(label: _trackLabel(t, l), checked: t.selected, onSelected: () => player.selectAudio(t.id)),
+];
 
 List<UhfMenuEntry> subtitleMenuEntries(PlayerController player, AppLocalizations l) => [
-      UhfMenuEntry(
-        label: l.subtitlesOff,
-        checked: player.selectedSubtitleId == null,
-        onSelected: () => player.selectSubtitle(null),
-      ),
-      for (final t in player.subtitleTracks)
-        UhfMenuEntry(label: _trackLabel(t, l), checked: t.selected, onSelected: () => player.selectSubtitle(t.id)),
-    ];
+  UhfMenuEntry(
+    label: l.subtitlesOff,
+    checked: player.selectedSubtitleId == null,
+    onSelected: () => player.selectSubtitle(null),
+  ),
+  for (final t in player.subtitleTracks)
+    UhfMenuEntry(label: _trackLabel(t, l), checked: t.selected, onSelected: () => player.selectSubtitle(t.id)),
+];
 
 List<UhfMenuEntry> moreMenuEntries({
   required PlayerController player,
@@ -31,15 +32,17 @@ List<UhfMenuEntry> moreMenuEntries({
   required SettingsController settings,
   required AppLocalizations l,
   required VoidCallback onSubtitleSettings,
+  MusicIdController? music,
 }) {
   final language = settings.value.language;
   UhfMenuEntry lang(String code, String label) => UhfMenuEntry(
-        label: label,
-        checked: language == code,
-        onSelected: () => settings.update((s) => s.copyWith(language: code)),
-      );
+    label: label,
+    checked: language == code,
+    onSelected: () => settings.update((s) => s.copyWith(language: code)),
+  );
   return [
     UhfMenuEntry(label: l.menuScreenshot, shortcut: 'S', onSelected: player.screenshot),
+    if (music != null) UhfMenuEntry(label: l.menuIdentifyMusic, shortcut: 'Ctrl+I', onSelected: music.identify),
     UhfMenuEntry(
       label: l.menuMonoLeft,
       checked: player.pan == PanMode.left,
@@ -51,12 +54,16 @@ List<UhfMenuEntry> moreMenuEntries({
       onSelected: () => player.togglePan(PanMode.right),
     ),
     UhfMenuEntry(label: l.menuSubtitleSettings, onSelected: onSubtitleSettings),
+    if (music != null)
+      UhfMenuEntry(
+        label: l.menuAutoRename,
+        checked: settings.value.autoRename,
+        onSelected: () => settings.update((s) => s.copyWith(autoRename: !s.autoRename)),
+      ),
     UhfMenuEntry(label: l.tooltipPin, checked: shell.alwaysOnTop, onSelected: shell.toggleAlwaysOnTop),
-    UhfMenuEntry(label: l.menuLanguage, children: [
-      lang('system', l.languageSystem),
-      lang('en', 'English'),
-      lang('fr', 'Français'),
-      lang('tr', 'Türkçe'),
-    ]),
+    UhfMenuEntry(
+      label: l.menuLanguage,
+      children: [lang('system', l.languageSystem), lang('en', 'English'), lang('fr', 'Français'), lang('tr', 'Türkçe')],
+    ),
   ];
 }

@@ -7,6 +7,7 @@ import '../../ui/tokens.dart';
 import '../../ui/typography.dart';
 import '../../ui/uhf_icon_button.dart';
 import '../../ui/uhf_menu.dart';
+import '../music_id/music_id_controller.dart';
 import '../settings/settings_controller.dart';
 import '../shell/shell_controller.dart';
 import '../studio/studio_controller.dart';
@@ -26,6 +27,7 @@ class ControlsOverlay extends StatelessWidget {
     required this.visibility,
     required this.onMenuOpenChanged,
     this.studio,
+    this.music,
   });
 
   final PlayerController player;
@@ -34,6 +36,7 @@ class ControlsOverlay extends StatelessWidget {
   final ControlsVisibility visibility;
   final ValueChanged<bool> onMenuOpenChanged;
   final StudioController? studio;
+  final MusicIdController? music;
 
   @override
   Widget build(BuildContext context) {
@@ -94,6 +97,7 @@ class ControlsOverlay extends StatelessWidget {
                           settings: settings,
                           l: l,
                           onSubtitleSettings: () => showSubtitleSettings(context, player),
+                          music: music,
                         ),
                         onOpenChanged: onMenuOpenChanged,
                       ),
