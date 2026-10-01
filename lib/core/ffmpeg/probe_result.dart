@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../geometry/geometry.dart';
+
 enum FieldOrder { progressive, tff, bff }
 
 class SubtitleStreamInfo {
@@ -13,6 +15,14 @@ class SubtitleStreamInfo {
   final bool isText;
 }
 
+class AudioStreamInfo {
+  const AudioStreamInfo({required this.index, required this.codec});
+
+  /// Absolute stream index, the same as mpv's `ff-index`.
+  final int index;
+  final String codec;
+}
+
 class ProbeResult {
   const ProbeResult({
     required this.videoBitRate,
@@ -21,6 +31,8 @@ class ProbeResult {
     required this.bitDepth,
     required this.duration,
     required this.subtitles,
+    this.videoSize,
+    this.audioStreams = const [],
   });
 
   final int? videoBitRate;
@@ -31,6 +43,10 @@ class ProbeResult {
   final int bitDepth;
   final Duration? duration;
   final List<SubtitleStreamInfo> subtitles;
+
+  /// Coded size of the first video stream; null for audio-only files.
+  final IntSize? videoSize;
+  final List<AudioStreamInfo> audioStreams;
 
   bool get isInterlaced => fieldOrder != FieldOrder.progressive;
 
@@ -60,12 +76,24 @@ class ProbeResult {
               isText: _textSubtitleCodecs.contains(s['codec_name']),
             ),
       ],
+      videoSize: _size(video),
+      audioStreams: [
+        for (final s in streams)
+          if (s['codec_type'] == 'audio' && s['index'] is int)
+            AudioStreamInfo(index: s['index'] as int, codec: '${s['codec_name'] ?? ''}'),
+      ],
     );
   }
 
   static int? _positiveInt(Object? v) {
     final parsed = v is int ? v : int.tryParse('${v ?? ''}');
     return (parsed != null && parsed > 0) ? parsed : null;
+  }
+
+  static IntSize? _size(Map<String, dynamic>? video) {
+    final w = _positiveInt(video?['width']);
+    final h = _positiveInt(video?['height']);
+    return (w == null || h == null) ? null : IntSize(w, h);
   }
 
   static FieldOrder _fieldOrder(Object? v) {

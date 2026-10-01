@@ -1,6 +1,7 @@
 import '../geometry/crop_math.dart';
 import '../geometry/rotation.dart';
 import '../util/time_format.dart';
+import '../files/output_naming.dart';
 import 'export_plan.dart';
 import 'probe_result.dart';
 
@@ -26,11 +27,6 @@ HwEncoder? pickHwEncoder(String encodersOutput) {
   return null;
 }
 
-bool _isMp4Family(String path) {
-  final lower = path.toLowerCase();
-  return lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.m4v');
-}
-
 abstract final class ExportCommandBuilder {
   // Subtitle codecs the Matroska muxer stores as-is (teletext and others are dropped).
   static const _matroskaSubtitleCodecs = {
@@ -38,6 +34,9 @@ abstract final class ExportCommandBuilder {
   };
 
   static const _minTrim = Duration(milliseconds: 100);
+
+  // LPCM flavours the Matroska muxer refuses; re-encoded losslessly.
+  static const _matroskaRejectedAudio = {'pcm_bluray', 'pcm_dvd'};
 
   static ExportCommand build(ExportPlan plan, ProbeResult probe, {HwEncoder? hwEncoder}) {
     final doRotate = plan.rotation != Rotation.none;
@@ -87,7 +86,7 @@ abstract final class ExportCommandBuilder {
 
     args.addAll(['-map', plan.videoFfIndex != null ? '0:${plan.videoFfIndex}' : '0:v:0']);
     args.addAll(['-map', plan.audioFfIndex != null ? '0:${plan.audioFfIndex}' : '0:a:0?']);
-    if (_isMp4Family(plan.outputPath)) {
+    if (isMp4Family(plan.outputPath)) {
       final textSubs = probe.subtitles.where((s) => s.isText).toList();
       for (final s in textSubs) {
         args.addAll(['-map', '0:${s.index}']);
@@ -126,7 +125,12 @@ abstract final class ExportCommandBuilder {
       args.addAll(['-fps_mode', 'cfr']);
     }
 
-    args.addAll(['-pix_fmt', 'yuv420p', '-c:a', 'copy', '-map_metadata', '0', plan.outputPath]);
+    final audioCodec = (plan.audioFfIndex != null
+            ? probe.audioStreams.where((a) => a.index == plan.audioFfIndex).firstOrNull
+            : probe.audioStreams.firstOrNull)
+        ?.codec;
+    final audio = !isMp4Family(plan.outputPath) && _matroskaRejectedAudio.contains(audioCodec) ? 'flac' : 'copy';
+    args.addAll(['-pix_fmt', 'yuv420p', '-c:a', audio, '-map_metadata', '0', plan.outputPath]);
 
     return ExportCommand(
       args: List.unmodifiable(args),

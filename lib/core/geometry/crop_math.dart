@@ -10,6 +10,19 @@ abstract final class CropMath {
   static IntSize displaySize(IntSize source, Rotation r) =>
       r.swapsAxes ? IntSize(source.height, source.width) : source;
 
+  /// Size of the picture as drawn by the video widget. [reported] is what
+  /// the engine says (aspect-corrected display size); depending on the mpv
+  /// build it may or may not include the user rotation, so it is turned when
+  /// its orientation contradicts [r]. Falls back to the coded size.
+  static IntSize displayedPictureSize(IntSize? reported, IntSize source, Rotation r) {
+    final expected = displaySize(source, r);
+    if (reported == null || reported.width <= 0 || reported.height <= 0) return expected;
+    final reportedLandscape = reported.width > reported.height;
+    final expectedLandscape = expected.width > expected.height;
+    if (reported.width == reported.height || reportedLandscape == expectedLandscape) return reported;
+    return IntSize(reported.height, reported.width);
+  }
+
   /// Where the picture is drawn inside a viewport (letterboxed, centered).
   static DRect? videoRectInViewport(IntSize source, Rotation r, double viewportWidth, double viewportHeight) {
     final display = displaySize(source, r);
