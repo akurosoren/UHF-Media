@@ -1,17 +1,23 @@
 import 'dart:convert';
 import 'dart:io';
 
+/// Never throws: an unreadable or locked file reads as null, so startup always
+/// reaches the window with defaults.
 Future<Map<String, dynamic>?> readJsonObject(File file) async {
-  if (!await file.exists()) return null;
   try {
-    final decoded = jsonDecode(utf8.decode(await file.readAsBytes()));
-    if (decoded is Map<String, dynamic>) return decoded;
-  } on FormatException {
-    // Not UTF-8 or not JSON: keep the unreadable file aside and start fresh.
+    if (!await file.exists()) return null;
+    try {
+      final decoded = jsonDecode(utf8.decode(await file.readAsBytes()));
+      if (decoded is Map<String, dynamic>) return decoded;
+    } on FormatException {
+      // Not UTF-8 or not JSON: keep the unreadable file aside and start fresh.
+    }
+    final backup = File('${file.path}.bak');
+    if (await backup.exists()) await backup.delete();
+    await file.rename(backup.path);
+  } on FileSystemException {
+    // Locked, unreadable, or the .bak cannot be written: start fresh.
   }
-  final backup = File('${file.path}.bak');
-  if (await backup.exists()) await backup.delete();
-  await file.rename(backup.path);
   return null;
 }
 

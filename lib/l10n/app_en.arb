@@ -37,5 +37,7 @@
   "@toastResumed": { "placeholders": { "time": { "type": "String" } } },
   "toastScreenshotSaved": "Screenshot saved",
   "toastOpenFailed": "Couldn't open this file",
-  "dialogOpenTitle": "Open a video"
+  "dialogOpenTitle": "Open a video",
+  "startupFailed": "UHF Media could not start.",
+  "@startupFailed": { "description": "Shown instead of the player when startup fails (settings, window or video engine)." }
 }

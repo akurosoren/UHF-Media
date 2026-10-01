@@ -116,4 +116,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dialogOpenTitle => 'Open a video';
+
+  @override
+  String get startupFailed => 'UHF Media could not start.';
 }

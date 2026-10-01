@@ -34,5 +34,6 @@
   "toastResumed": "{time} konumundan devam ediliyor",
   "toastScreenshotSaved": "Ekran görüntüsü kaydedildi",
   "toastOpenFailed": "Bu dosya açılamadı",
-  "dialogOpenTitle": "Video aç"
+  "dialogOpenTitle": "Video aç",
+  "startupFailed": "UHF Media başlatılamadı."
 }

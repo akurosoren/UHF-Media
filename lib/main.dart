@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:window_manager/window_manager.dart';
 import 'package:windows_single_instance/windows_single_instance.dart';
 
+import 'app/uhf_app.dart';
 import 'app/uhf_root.dart';
 import 'core/files/media_files.dart';
 import 'core/media/media_kit_engine.dart';
@@ -24,6 +25,7 @@ import 'features/settings/settings_controller.dart';
 import 'features/shell/app_shell.dart';
 import 'features/shell/second_instance.dart';
 import 'features/shell/shell_controller.dart';
+import 'features/shell/startup_error_screen.dart';
 import 'features/shell/window_manager_host.dart';
 import 'ui/toast.dart';
 import 'ui/tokens.dart';
@@ -37,9 +39,18 @@ Future<void> main(List<String> args) async {
     'uhf_media_single_instance',
     onSecondWindow: SecondInstance.deliver,
   );
-  MediaKit.ensureInitialized();
   await windowManager.ensureInitialized();
+  try {
+    await _start(args);
+  } on Object catch (e) {
+    // Never leave an invisible process holding the single-instance pipe.
+    await windowManager.show();
+    runApp(UhfApp(home: StartupErrorScreen(detail: '$e')));
+  }
+}
 
+Future<void> _start(List<String> args) async {
+  MediaKit.ensureInitialized();
   final dataDir = Directory(p.join(Platform.environment['APPDATA'] ?? Directory.systemTemp.path, 'UHF Media'));
   final settingsStore = SettingsStore(dataDir);
   final initial = await settingsStore.load();

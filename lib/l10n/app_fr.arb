@@ -34,5 +34,6 @@
   "toastResumed": "Reprise à {time}",
   "toastScreenshotSaved": "Capture enregistrée",
   "toastOpenFailed": "Impossible d'ouvrir ce fichier",
-  "dialogOpenTitle": "Ouvrir une vidéo"
+  "dialogOpenTitle": "Ouvrir une vidéo",
+  "startupFailed": "UHF Media n'a pas pu démarrer."
 }

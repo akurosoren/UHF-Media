@@ -61,6 +61,14 @@ void main() {
     expect(s.muted, isFalse);
   });
 
+  test('a corrupted file that cannot be set aside still gives defaults (final review)', () async {
+    File('${dir.path}/settings.json').writeAsStringSync('{ not json');
+    // The .bak name is taken by a folder, so the rename fails.
+    Directory('${dir.path}/settings.json.bak/keep').createSync(recursive: true);
+    final s = await SettingsStore(dir).load();
+    expect(s.volume, 80);
+  });
+
   test('non UTF-8 file gives defaults and is kept as .bak', () async {
     File('${dir.path}/settings.json').writeAsBytesSync([0x7B, 0x22, 0xE9, 0x22, 0x3A, 0x31, 0x7D]);
     final s = await SettingsStore(dir).load();

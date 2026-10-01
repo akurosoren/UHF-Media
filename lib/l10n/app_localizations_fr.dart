@@ -116,4 +116,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get dialogOpenTitle => 'Ouvrir une vidéo';
+
+  @override
+  String get startupFailed => 'UHF Media n\'a pas pu démarrer.';
 }

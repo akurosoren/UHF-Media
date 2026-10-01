@@ -309,6 +309,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open a video'**
   String get dialogOpenTitle;
+
+  /// Shown instead of the player when startup fails (settings, window or video engine).
+  ///
+  /// In en, this message translates to:
+  /// **'UHF Media could not start.'**
+  String get startupFailed;
 }
 
 class _AppLocalizationsDelegate
