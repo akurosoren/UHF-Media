@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
+import '../../core/ffmpeg/probe_result.dart';
+import '../../core/geometry/rotation.dart';
 import '../../core/files/media_files.dart';
 import '../../core/geometry/geometry.dart';
 import '../../core/media/media_engine.dart';
@@ -39,20 +41,22 @@ class PlayerController extends ChangeNotifier {
     Future<String> Function()? desktopDirectory,
     DateTime Function()? now,
     bool Function(String path)? fileExists,
+    Future<void> Function(String from, String to)? renameFile,
     double initialVolume = 80,
     bool initialMuted = false,
     int initialSubtitleScale = 100,
     int initialSubtitlePos = 100,
-  })  : _engine = engine,
-        _resume = resume,
-        _probe = probe,
-        _desktopDirectory = desktopDirectory ?? (() async => Directory.current.path),
-        _now = now ?? DateTime.now,
-        _fileExists = fileExists ?? ((path) => File(path).existsSync()),
-        _volume = initialVolume,
-        _muted = initialMuted,
-        _subtitleScale = initialSubtitleScale,
-        _subtitlePos = initialSubtitlePos {
+  }) : _engine = engine,
+       _resume = resume,
+       _probe = probe,
+       _desktopDirectory = desktopDirectory ?? (() async => Directory.current.path),
+       _now = now ?? DateTime.now,
+       _fileExists = fileExists ?? ((path) => File(path).existsSync()),
+       _renameFile = renameFile ?? _renameOnDisk,
+       _volume = initialVolume,
+       _muted = initialMuted,
+       _subtitleScale = initialSubtitleScale,
+       _subtitlePos = initialSubtitlePos {
     _subscriptions.addAll([
       engine.position.listen(_onPosition),
       engine.duration.listen(_onDuration),
@@ -80,6 +84,12 @@ class PlayerController extends ChangeNotifier {
   final Future<String> Function() _desktopDirectory;
   final DateTime Function() _now;
   final bool Function(String path) _fileExists;
+  final Future<void> Function(String from, String to) _renameFile;
+
+  static Future<void> _renameOnDisk(String from, String to) async {
+    await File(from).rename(to);
+  }
+
   final List<StreamSubscription<Object?>> _subscriptions = [];
   final _events = StreamController<PlayerEvent>.broadcast();
 
@@ -98,6 +108,12 @@ class PlayerController extends ChangeNotifier {
   int _subtitleScale;
   int _subtitlePos;
   PanMode _pan = PanMode.stereo;
+  Rotation _rotation = Rotation.none;
+  ProbeResult? _probeResult;
+
+  /// Exact position to restore after a reopen (rename), instead of the
+  /// saved resume position.
+  Duration? _forcedStart;
   IntSize? _videoSize;
 
   String? get path => _path;
@@ -117,7 +133,14 @@ class PlayerController extends ChangeNotifier {
   IntSize? get videoSize => _videoSize;
   Stream<PlayerEvent> get events => _events.stream;
 
-  Future<void> open(String path) async {
+  ProbeResult? get probe => _probeResult;
+  Rotation get rotation => _rotation;
+  int? get videoFfIndex => _tracks.where((t) => t.type == TrackType.video && t.selected).firstOrNull?.ffIndex;
+  int? get audioFfIndex => _tracks.where((t) => t.type == TrackType.audio && t.selected).firstOrNull?.ffIndex;
+
+  Future<void> open(String path) => _openFile(path);
+
+  Future<void> _openFile(String path, {Duration? startAt}) async {
     if (!_fileExists(path)) {
       _events.add(OpenFailedEvent(path));
       return;
@@ -129,16 +152,24 @@ class PlayerController extends ChangeNotifier {
     _duration = Duration.zero;
     _lastRecorded = Duration.zero;
     _pendingResume = true;
+    _forcedStart = startAt;
     _tracks = const [];
     _pan = PanMode.stereo;
+    _rotation = Rotation.none;
+    _probeResult = null;
     _videoSize = null;
     notifyListeners();
     try {
       await _engine.setPan(PanMode.stereo);
+      await _engine.setRotation(Rotation.none);
       await _engine.open(path);
       await _engine.setSubtitleScale(_subtitleScale);
       await _engine.setSubtitlePosition(_subtitlePos);
       final probe = await _probe?.probe(path);
+      if (_path == path) {
+        _probeResult = probe;
+        notifyListeners();
+      }
       await _engine.setDeinterlace(probe?.isInterlaced ?? false);
     } on Exception {
       _failOpen(path);
@@ -167,10 +198,16 @@ class PlayerController extends ChangeNotifier {
     final path = _path;
     if (_pendingResume && path != null && d > Duration.zero) {
       _pendingResume = false;
-      final resumeAt = _resume.resumePositionFor(path, d);
-      if (resumeAt != null) {
-        unawaited(_engine.seek(resumeAt));
-        _events.add(ResumedEvent(resumeAt));
+      final forced = _forcedStart;
+      _forcedStart = null;
+      if (forced != null) {
+        if (forced > Duration.zero) unawaited(_engine.seek(forced));
+      } else {
+        final resumeAt = _resume.resumePositionFor(path, d);
+        if (resumeAt != null) {
+          unawaited(_engine.seek(resumeAt));
+          _events.add(ResumedEvent(resumeAt));
+        }
       }
     }
     notifyListeners();
@@ -198,6 +235,51 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> togglePlay() => _playing ? _engine.pause() : _engine.play();
+
+  Future<void> pause() => _engine.pause();
+
+  Future<void> setRotation(Rotation r) async {
+    _rotation = r;
+    notifyListeners();
+    await _engine.setRotation(r);
+  }
+
+  /// Renames the open file. When Windows refuses (the file is in use), closes
+  /// it, renames, and reopens it at the same position and play state. Returns
+  /// false when the rename is refused even then; the original file is then
+  /// reopened where it was.
+  Future<bool> renameOpenFile(String newPath) async {
+    final from = _path;
+    if (from == null) return false;
+    if (_position > Duration.zero) _resume.record(from, _position);
+    try {
+      await _renameFile(from, newPath);
+      _resume.migrate(from, newPath);
+      _path = newPath;
+      notifyListeners();
+      await _flushResume();
+      return true;
+    } on FileSystemException {
+      // Probably held open by the player: close it and try again.
+    }
+
+    final at = _position;
+    final wasPlaying = _playing;
+    await close();
+    var target = newPath;
+    var renamed = true;
+    try {
+      await _renameFile(from, newPath);
+      _resume.migrate(from, newPath);
+      await _flushResume();
+    } on FileSystemException {
+      renamed = false;
+      target = from;
+    }
+    await _openFile(target, startAt: at);
+    if (!wasPlaying) await _engine.pause();
+    return renamed;
+  }
 
   Future<void> seekTo(Duration target) {
     var t = target < Duration.zero ? Duration.zero : target;
