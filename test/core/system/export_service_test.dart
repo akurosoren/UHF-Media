@@ -37,14 +37,23 @@ void main() {
     encoderQueries = 0;
   });
 
-  ExportService service({String encoders = ' V....D h264_nvenc   NVIDIA NVENC', Set<String> existing = const {}}) =>
+  ExportService service({
+    String encoders = ' V....D h264_nvenc   NVIDIA NVENC',
+    Set<String> working = const {'h264_nvenc'},
+    Set<String> existing = const {},
+  }) =>
       ExportService(
         ffmpegPath: r'C:\App\ffmpeg.exe',
         expectedFolder: r'C:\App',
         run: (exe, args) async {
-          encoderQueries++;
-          expect(args, ['-hide_banner', '-encoders']);
-          return ProcessResult(1, 0, encoders, '');
+          if (args.contains('-encoders')) {
+            encoderQueries++;
+            expect(args, ['-hide_banner', '-encoders']);
+            return ProcessResult(1, 0, encoders, '');
+          }
+          // One-frame test encode with a listed encoder.
+          final encoder = args[args.indexOf('-c:v') + 1];
+          return ProcessResult(1, working.contains(encoder) ? 0 : 1, '', '');
         },
         start: (exe, args) async {
           started.add(args);
@@ -64,6 +73,29 @@ void main() {
     expect(started[0], contains('h264_nvenc'));
     expect(started[1], contains('libx264'));
     expect(started[1], isNot(contains('h264_nvenc')));
+  });
+
+  test('a listed encoder that cannot encode is skipped (manual check: AMD machine)', () async {
+    processes = [FakeProcess(stdoutLines: ['progress=end'])];
+    var retries = 0;
+    final s = service(
+      encoders: ' V....D h264_nvenc NVIDIA\n V....D h264_qsv Intel\n V....D h264_amf AMD',
+      working: {'h264_amf'},
+    );
+    await s.export(_input, onProgress: (_) {}, onCpuRetry: () => retries++);
+    expect(await s.hwEncoder(), HwEncoder.amf);
+    expect(started.single, contains('h264_amf'));
+    expect(retries, 0);
+  });
+
+  test('when no listed encoder works, the CPU is used directly', () async {
+    processes = [FakeProcess(stdoutLines: ['progress=end'])];
+    var retries = 0;
+    final s = service(working: const {});
+    await s.export(_input, onProgress: (_) {}, onCpuRetry: () => retries++);
+    expect(await s.hwEncoder(), isNull);
+    expect(started.single, contains('libx264'));
+    expect(retries, 0);
   });
 
   test('the encoder list is read once', () async {

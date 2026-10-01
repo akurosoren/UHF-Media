@@ -76,7 +76,9 @@ class ExportService implements Exporter {
   @override
   bool get available => _ffmpeg != null;
 
-  /// Hardware H.264 encoder listed by this ffmpeg build, detected once.
+  /// First hardware H.264 encoder that actually works here, detected once.
+  /// Builds list NVENC, QSV and AMF whatever the GPU, so each listed one
+  /// encodes a one-frame test picture (NVENC fails on an AMD machine).
   Future<HwEncoder?> hwEncoder() => _hw ??= _detectHwEncoder();
 
   Future<HwEncoder?> _detectHwEncoder() async {
@@ -84,7 +86,18 @@ class ExportService implements Exporter {
     if (ffmpeg == null) return null;
     try {
       final r = await _run(ffmpeg, ['-hide_banner', '-encoders']);
-      return r.exitCode == 0 ? pickHwEncoder('${r.stdout}') : null;
+      if (r.exitCode != 0) return null;
+      final listed = '${r.stdout}';
+      for (final encoder in HwEncoder.values) {
+        if (!listed.contains(encoder.ffmpegName)) continue;
+        final test = await _run(ffmpeg, [
+          '-hide_banner', '-v', 'error',
+          '-f', 'lavfi', '-i', 'color=c=black:s=256x256:d=0.1',
+          '-frames:v', '1', '-c:v', encoder.ffmpegName, '-f', 'null', '-',
+        ]);
+        if (test.exitCode == 0) return encoder;
+      }
+      return null;
     } on Exception {
       return null;
     }
