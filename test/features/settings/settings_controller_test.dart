@@ -22,8 +22,14 @@ void main() {
     expect(notified, 1);
     expect((await store.load()).volume, 80);
 
-    await Future<void>.delayed(const Duration(milliseconds: 60));
-    expect((await store.load()).volume, 42);
+    // Poll: under a loaded parallel test run the debounced write can land late.
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    var saved = (await store.load()).volume;
+    while (saved != 42 && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      saved = (await store.load()).volume;
+    }
+    expect(saved, 42);
   });
 
   test('an identical value neither notifies nor saves', () async {
