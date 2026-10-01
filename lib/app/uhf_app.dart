@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../ui/theme.dart';
 
 class UhfApp extends StatelessWidget {
@@ -15,6 +16,15 @@ class UhfApp extends StatelessWidget {
       theme: buildUhfTheme(),
       debugShowCheckedModeBanner: false,
       locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localeResolutionCallback: (device, supported) {
+        if (device == null) return const Locale('en');
+        for (final locale in supported) {
+          if (locale.languageCode == device.languageCode) return locale;
+        }
+        return const Locale('en');
+      },
       home: Scaffold(body: home ?? const SizedBox.expand()),
     );
   }

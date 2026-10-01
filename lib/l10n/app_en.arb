@@ -1,0 +1,6 @@
+{
+  "@@locale": "en",
+  "appTitle": "UHF Media",
+  "idleHint": "Drop a video here · Ctrl+O",
+  "@idleHint": { "description": "Hint under the UHF logo when no file is open." }
+}
