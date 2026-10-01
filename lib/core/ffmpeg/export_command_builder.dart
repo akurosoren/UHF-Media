@@ -141,6 +141,9 @@ abstract final class ExportCommandBuilder {
       '-pix_fmt', 'yuv420p',
       '-c:a', audio,
       if (audio == 'aac') ...['-b:a', '256k'],
+      // A subtitle event that starts before the cut has a negative time; by
+      // default ffmpeg would shift every stream later to compensate.
+      if (trim != null) ...['-avoid_negative_ts', 'disabled'],
       '-map_metadata', '0',
       plan.outputPath,
     ]);
