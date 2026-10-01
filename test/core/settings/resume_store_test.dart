@@ -31,6 +31,15 @@ void main() {
     expect(s.resumePositionFor('c:/videos/a.mkv', movie), const Duration(minutes: 5));
   });
 
+  test('flush writes nothing until something changed', () async {
+    final s = store();
+    await s.flush();
+    expect(File('${dir.path}/resume.json').existsSync(), isFalse);
+    s.record(r'C:.mkv', const Duration(minutes: 3));
+    await s.flush();
+    expect(File('${dir.path}/resume.json').existsSync(), isTrue);
+  });
+
   test('persists across instances', () async {
     final a = store()..record(r'C:\v\a.mkv', const Duration(minutes: 3));
     await a.flush();

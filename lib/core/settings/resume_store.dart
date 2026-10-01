@@ -12,8 +12,8 @@ class _Entry {
 
 class ResumeStore {
   ResumeStore(Directory dir, {DateTime Function()? now, this.maxEntries = 500})
-      : _file = File('${dir.path}${Platform.pathSeparator}resume.json'),
-        _now = now ?? DateTime.now;
+    : _file = File('${dir.path}${Platform.pathSeparator}resume.json'),
+      _now = now ?? DateTime.now;
 
   static const _minFromStart = Duration(seconds: 10);
   static const _minFromEnd = Duration(seconds: 30);
@@ -22,6 +22,7 @@ class ResumeStore {
   final DateTime Function() _now;
   final int maxEntries;
   final Map<String, _Entry> _entries = {};
+  bool _dirty = false;
 
   int get length => _entries.length;
 
@@ -50,22 +51,33 @@ class ResumeStore {
 
   void record(String path, Duration position) {
     _entries[_key(path)] = _Entry(position.inMilliseconds, _now().millisecondsSinceEpoch);
+    _dirty = true;
     _trim();
   }
 
-  void clear(String path) => _entries.remove(_key(path));
+  void clear(String path) {
+    if (_entries.remove(_key(path)) != null) _dirty = true;
+  }
 
   void migrate(String oldPath, String newPath) {
     final entry = _entries.remove(_key(oldPath));
-    if (entry != null) _entries[_key(newPath)] = entry;
+    if (entry != null) {
+      _entries[_key(newPath)] = entry;
+      _dirty = true;
+    }
   }
 
-  Future<void> flush() => writeJsonAtomic(_file, {
-        'version': 1,
-        'entries': {
-          for (final e in _entries.entries) e.key: {'pos_ms': e.value.positionMs, 'updated': e.value.updatedMs},
-        },
-      });
+  /// Writes resume.json, only when an entry changed since the last flush.
+  Future<void> flush() async {
+    if (!_dirty) return;
+    _dirty = false;
+    await writeJsonAtomic(_file, {
+      'version': 1,
+      'entries': {
+        for (final e in _entries.entries) e.key: {'pos_ms': e.value.positionMs, 'updated': e.value.updatedMs},
+      },
+    });
+  }
 
   void _trim() {
     if (_entries.length <= maxEntries) return;
