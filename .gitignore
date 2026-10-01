@@ -1,14 +1,32 @@
-# Python
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+*.iml
+.idea/
+.vscode/
+coverage/
+
+# Python (legacy)
 __pycache__/
 *.pyc
 .venv/
 
-# PyInstaller
-build/
+# PyInstaller (legacy)
 dist/
 *.spec
 
-# External binaries (copy manually, see README)
+# External binaries (see README)
 ffmpeg.exe
 ffprobe.exe
 libmpv-2.dll
+third_party/ffmpeg/
+
+# Installer output
+installer/Output/
+
+# Superpowers plan workspaces
+.superpowers/
