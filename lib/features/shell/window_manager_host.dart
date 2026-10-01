@@ -92,6 +92,9 @@ class WindowManagerHost with WindowListener implements WindowHost {
   Future<Rect> getBounds() => windowManager.getBounds();
 
   @override
+  Future<bool> isMaximized() => windowManager.isMaximized();
+
+  @override
   Future<void> bringToFront() async {
     if (await windowManager.isMinimized()) await windowManager.restore();
     await windowManager.show();

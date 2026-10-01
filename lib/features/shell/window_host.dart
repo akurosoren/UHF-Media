@@ -14,4 +14,5 @@ abstract interface class WindowHost {
   Future<void> startDragging();
   Future<void> bringToFront();
   Future<Rect> getBounds();
+  Future<bool> isMaximized();
 }

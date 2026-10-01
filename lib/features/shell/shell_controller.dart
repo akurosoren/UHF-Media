@@ -27,7 +27,17 @@ class ShellController extends ChangeNotifier {
     final next = !_fullscreen;
     await _host.setFullScreen(next);
     _fullscreen = next;
+    if (!next) await _syncMaximized();
     notifyListeners();
+  }
+
+  /// window_manager 0.5.2 can miss maximize/unmaximize events around
+  /// fullscreen (a restore arrives as leave-full-screen): ask the window.
+  Future<void> _syncMaximized() async {
+    final maximized = await _host.isMaximized();
+    if (maximized == _maximized) return;
+    _maximized = maximized;
+    _settings.update((s) => s.copyWith(maximized: maximized));
   }
 
   Future<void> exitFullscreen() async {
@@ -61,6 +71,7 @@ class ShellController extends ChangeNotifier {
         _fullscreen = true;
       case WindowEvent.leftFullScreen:
         _fullscreen = false;
+        await _syncMaximized();
       case WindowEvent.boundsChanged:
         if (_maximized || _fullscreen) return;
         final b = await _host.getBounds();

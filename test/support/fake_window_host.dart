@@ -6,6 +6,7 @@ import 'package:uhf_media/features/shell/window_host.dart';
 class FakeWindowHost implements WindowHost {
   final calls = <String>[];
   Rect bounds = const Rect.fromLTWH(100, 50, 1100, 780);
+  bool isMaximizedValue = false;
   final _events = StreamController<WindowEvent>.broadcast();
 
   void emit(WindowEvent e) => _events.add(e);
@@ -32,4 +33,6 @@ class FakeWindowHost implements WindowHost {
   Future<void> bringToFront() async => calls.add('front');
   @override
   Future<Rect> getBounds() async => bounds;
+  @override
+  Future<bool> isMaximized() async => isMaximizedValue;
 }

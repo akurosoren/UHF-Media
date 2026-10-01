@@ -35,6 +35,22 @@ void main() {
     expect(shell.fullscreen, isFalse);
   });
 
+  test('maximized state is read back from the window after fullscreen (final review)', () async {
+    final shell = ShellController(host, settings);
+    host.isMaximizedValue = true;
+    host.emit(WindowEvent.maximized);
+    await settle();
+    await shell.toggleFullscreen();
+    await shell.toggleFullscreen();
+    // window_manager 0.5.2 reports the later restore as leave-full-screen,
+    // not unmaximize.
+    host.isMaximizedValue = false;
+    host.emit(WindowEvent.leftFullScreen);
+    await settle();
+    expect(shell.maximized, isFalse);
+    expect(settings.value.maximized, isFalse);
+  });
+
   test('fullscreen toggles and exits', () async {
     final shell = ShellController(host, settings);
     await shell.toggleFullscreen();
