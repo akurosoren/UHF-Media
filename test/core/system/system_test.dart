@@ -5,6 +5,7 @@ import 'package:uhf_media/core/system/ffmpeg_locator.dart';
 import 'package:uhf_media/core/system/known_folders.dart';
 import 'package:uhf_media/core/system/launch_args.dart';
 import 'package:uhf_media/core/system/probe_service.dart';
+import 'package:uhf_media/core/system/process_runner.dart';
 
 void main() {
   group('FfmpegLocator', () {
@@ -57,24 +58,43 @@ void main() {
   });
 
   group('KnownFolders', () {
-    test('desktop comes from PowerShell and is cached', () async {
+    test('desktop comes from the shell, non-ASCII included, and is cached', () async {
       var calls = 0;
-      final folders = KnownFolders(run: (exe, args) async {
+      final folders = KnownFolders(shellDesktop: () {
         calls++;
-        return ProcessResult(1, 0, 'D:\\OneDrive\\Bureau\r\n', '');
+        return r'D:\OneDrive\Masaüstü';
       });
-      expect(await folders.desktop(), r'D:\OneDrive\Bureau');
-      expect(await folders.desktop(), r'D:\OneDrive\Bureau');
+      expect(await folders.desktop(), r'D:\OneDrive\Masaüstü');
+      expect(await folders.desktop(), r'D:\OneDrive\Masaüstü');
       expect(calls, 1);
     });
 
-    test('falls back to USERPROFILE\\Desktop', () async {
-      final folders = KnownFolders(
-        run: (_, _) async => throw const ProcessException('powershell', []),
+    test('falls back to USERPROFILE\\Desktop when the shell gives nothing or fails', () async {
+      final none = KnownFolders(shellDesktop: () => null, environment: {'USERPROFILE': r'C:\Users\me'});
+      expect(await none.desktop(), r'C:\Users\me\Desktop');
+      final failing = KnownFolders(
+        shellDesktop: () => throw const FormatException('boom'),
         environment: {'USERPROFILE': r'C:\Users\me'},
       );
-      expect(await folders.desktop(), r'C:\Users\me\Desktop');
+      expect(await failing.desktop(), r'C:\Users\me\Desktop');
     });
+
+    test('the real shell lookup returns an existing folder (final review)', () async {
+      expect(Directory(await KnownFolders().desktop()).existsSync(), isTrue);
+    });
+  });
+
+  test('real ffprobe runs detached and its JSON is parsed', () async {
+    final sample = '${Directory.systemTemp.path}\\uhf_samples\\interlaced.ts';
+    final result = await ProbeService(File('ffprobe.exe').absolute.path).probe(sample);
+    expect(result!.isInterlaced, isTrue);
+  },
+      skip: !File('ffprobe.exe').existsSync() ||
+          !File('${Directory.systemTemp.path}\\uhf_samples\\interlaced.ts').existsSync());
+
+  test('defaultProcessRunner captures the output of a console program (final review)', () async {
+    final r = await defaultProcessRunner('cmd', ['/c', 'echo hi']);
+    expect((r.stdout as String).trim(), 'hi');
   });
 
   test('firstExistingFile skips flags and missing paths', () {

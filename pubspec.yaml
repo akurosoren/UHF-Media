@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   desktop_drop: ^0.8.4
+  ffi: ^2.2.0
   fftea: ^1.5.0+1
   file_picker: ^13.1.0
   flutter:
@@ -21,6 +22,7 @@ dependencies:
   media_kit_libs_video: ^1.0.7
   media_kit_video: ^2.0.1
   path: ^1.9.1
+  win32: ^6.4.0
   window_manager: ^0.5.2
   windows_single_instance: ^1.2.0
 

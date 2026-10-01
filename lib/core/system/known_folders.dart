@@ -1,15 +1,15 @@
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
-
-import 'process_runner.dart';
+import 'package:win32/win32.dart';
 
 class KnownFolders {
-  KnownFolders({ProcessRunner? run, Map<String, String>? environment})
-      : _run = run ?? defaultProcessRunner,
+  KnownFolders({String? Function()? shellDesktop, Map<String, String>? environment})
+      : _shellDesktop = shellDesktop ?? shellDesktopPath,
         _env = environment ?? Platform.environment;
 
-  final ProcessRunner _run;
+  final String? Function() _shellDesktop;
   final Map<String, String> _env;
   String? _desktop;
 
@@ -18,18 +18,29 @@ class KnownFolders {
     final cached = _desktop;
     if (cached != null) return cached;
     try {
-      final r = await _run('powershell', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        "[Environment]::GetFolderPath('Desktop')",
-      ]);
-      final out = (r.stdout as String).trim();
-      if (r.exitCode == 0 && out.isNotEmpty) return _desktop = out;
-    } on ProcessException {
+      final path = _shellDesktop();
+      if (path != null && path.isNotEmpty) return _desktop = path;
+    } on Object {
       // Fall back below.
     }
     return _desktop = p.windows.join(_env['USERPROFILE'] ?? '', 'Desktop');
+  }
+}
+
+/// SHGetKnownFolderPath(FOLDERID_Desktop): UTF-16, no child process.
+String? shellDesktopPath() {
+  final rfid = FOLDERID_Desktop.toNative(allocator: calloc);
+  try {
+    final path = SHGetKnownFolderPath(rfid, KF_FLAG_DEFAULT, null);
+    try {
+      return path.toDartString();
+    } finally {
+      CoTaskMemFree(path);
+    }
+  } on WindowsException {
+    return null;
+  } finally {
+    calloc.free(rfid);
   }
 }
 
