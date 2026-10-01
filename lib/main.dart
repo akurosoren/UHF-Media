@@ -15,6 +15,7 @@ import 'core/files/media_files.dart';
 import 'core/media/media_kit_engine.dart';
 import 'core/settings/resume_store.dart';
 import 'core/settings/settings_store.dart';
+import 'core/system/export_service.dart';
 import 'core/system/ffmpeg_locator.dart';
 import 'core/system/known_folders.dart';
 import 'core/system/launch_args.dart';
@@ -26,6 +27,7 @@ import 'features/shell/app_shell.dart';
 import 'features/shell/second_instance.dart';
 import 'features/shell/shell_controller.dart';
 import 'features/shell/startup_error_screen.dart';
+import 'features/studio/studio_controller.dart';
 import 'features/shell/window_manager_host.dart';
 import 'ui/toast.dart';
 import 'ui/tokens.dart';
@@ -74,39 +76,47 @@ Future<void> _start(List<String> args) async {
     initialSubtitleScale: initial.subtitleScale,
     initialSubtitlePos: initial.subtitlePos,
   );
+  final studio = StudioController(
+    player: player,
+    exporter: ExportService(ffmpegPath: locator.locate('ffmpeg'), expectedFolder: locator.executableDir),
+  );
   final shell = ShellController(host, settings);
   final toasts = ToastController();
   bindPlayerSettings(player, settings);
 
   host.onCloseRequested = () async {
+    await studio.shutdown();
     await player.saveResume();
     await settings.flush();
   };
 
-  runApp(UhfRoot(
-    settings: settings,
-    home: AppShell(
-      player: player,
-      shell: shell,
+  runApp(
+    UhfRoot(
       settings: settings,
-      toasts: toasts,
-      videoBuilder: (_) => Video(
-        controller: engine.controller,
-        controls: null,
-        fill: UhfColors.ink,
-        subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
+      home: AppShell(
+        player: player,
+        shell: shell,
+        settings: settings,
+        toasts: toasts,
+        studio: studio,
+        videoBuilder: (_) => Video(
+          controller: engine.controller,
+          controls: null,
+          fill: UhfColors.ink,
+          subtitleViewConfiguration: const SubtitleViewConfiguration(visible: false),
+        ),
+        pickFile: (initialDirectory) async {
+          final files = await FilePicker.pickFiles(
+            initialDirectory: initialDirectory,
+            type: FileType.custom,
+            allowedExtensions: mediaExtensions,
+          );
+          return files.firstOrNull?.path;
+        },
+        revealFile: (path) => unawaited(revealInExplorer(path)),
       ),
-      pickFile: (initialDirectory) async {
-        final files = await FilePicker.pickFiles(
-          initialDirectory: initialDirectory,
-          type: FileType.custom,
-          allowedExtensions: mediaExtensions,
-        );
-        return files.firstOrNull?.path;
-      },
-      revealFile: (path) => unawaited(revealInExplorer(path)),
     ),
-  ));
+  );
 
   SecondInstance.listener = secondInstanceHandler(shell: shell, player: player);
   final initialFile = firstExistingFile(args);

@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import '../../core/ffmpeg/export_plan.dart';
+import '../../core/geometry/crop_math.dart';
+import '../../core/geometry/rotation.dart';
 import '../../core/files/media_files.dart';
 import '../../core/util/time_format.dart';
 import '../../l10n/app_localizations.dart';
@@ -15,6 +18,9 @@ import '../player/controls_overlay.dart';
 import '../player/controls_visibility.dart';
 import '../player/player_controller.dart';
 import '../settings/settings_controller.dart';
+import '../studio/crop_overlay.dart';
+import '../studio/studio_controller.dart';
+import '../studio/studio_panel.dart';
 import 'idle_screen.dart';
 import 'shell_controller.dart';
 import 'title_bar.dart';
@@ -40,6 +46,7 @@ class AppShell extends StatefulWidget {
     required this.videoBuilder,
     required this.pickFile,
     required this.revealFile,
+    this.studio,
   });
 
   final PlayerController player;
@@ -49,6 +56,7 @@ class AppShell extends StatefulWidget {
   final WidgetBuilder videoBuilder;
   final Future<String?> Function(String? initialDirectory) pickFile;
   final void Function(String path) revealFile;
+  final StudioController? studio;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -57,6 +65,12 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   final _visibility = ControlsVisibility();
   final _focus = FocusNode(debugLabel: 'app-shell');
+  // Under the video in the studio: always shown.
+  final _studioVisibility = ControlsVisibility();
+  StreamSubscription<StudioEvent>? _studioEvents;
+
+  StudioController? get _studio => widget.studio;
+  bool get _studioOpen => _studio?.isOpen ?? false;
   late final StreamSubscription<PlayerEvent> _events;
   bool _menuOpen = false;
   String? _shownFile;
@@ -69,11 +83,14 @@ class _AppShellState extends State<AppShell> {
     super.initState();
     _events = _player.events.listen(_onEvent);
     _player.addListener(_onPlayerChanged);
+    _studioEvents = _studio?.events.listen(_onStudioEvent);
   }
 
   @override
   void dispose() {
     unawaited(_events.cancel());
+    unawaited(_studioEvents?.cancel());
+    _studioVisibility.dispose();
     _player.removeListener(_onPlayerChanged);
     _visibility.dispose();
     _focus.dispose();
@@ -112,6 +129,39 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  void _onStudioEvent(StudioEvent event) {
+    if (!mounted) return;
+    final l = AppLocalizations.of(context);
+    final toasts = widget.toasts;
+    switch (event) {
+      case ExportFinishedEvent(:final path):
+        toasts.show(l.toastExportDone, actionLabel: l.actionShow, onAction: () => widget.revealFile(path));
+      case ExportCancelledEvent():
+        toasts.show(l.toastExportCancelled);
+      case ExportFailedEvent(:final log):
+        toasts.show(
+          l.toastExportFailed,
+          actionLabel: l.actionCopyDetails,
+          onAction: () => Clipboard.setData(ClipboardData(text: log)),
+        );
+      case ExportRetriedOnCpuEvent():
+        toasts.show(l.toastExportRetryCpu);
+      case ExportRejectedEvent(:final error):
+        toasts.show(switch (error) {
+          ExportPlanError.noChanges => l.toastNoChanges,
+          ExportPlanError.trimTooShort => l.toastTrimTooShort,
+          ExportPlanError.cropTooSmall => l.toastCropTooSmall,
+        });
+      case FfmpegMissingEvent(:final folder):
+        toasts.show(l.toastFfmpegMissing(folder));
+    }
+  }
+
+  void _inStudio(void Function(StudioController studio) action) {
+    final studio = _studio;
+    if (studio != null && studio.isOpen) action(studio);
+  }
+
   Future<void> _open() async {
     final path = await widget.pickFile(widget.settings.value.lastOpenDir);
     if (path == null) return;
@@ -121,20 +171,26 @@ class _AppShellState extends State<AppShell> {
   }
 
   Map<ShortcutActivator, VoidCallback> get _bindings => {
-        const SingleActivator(LogicalKeyboardKey.space): () => _player.togglePlay(),
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () => _player.seekRelative(const Duration(seconds: 3)),
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _player.seekRelative(const Duration(seconds: -3)),
-        const SingleActivator(LogicalKeyboardKey.arrowRight, shift: true): () => _player.frameStep(forward: true),
-        const SingleActivator(LogicalKeyboardKey.arrowLeft, shift: true): () => _player.frameStep(forward: false),
-        const SingleActivator(LogicalKeyboardKey.arrowUp): () => _player.adjustVolume(5),
-        const SingleActivator(LogicalKeyboardKey.arrowDown): () => _player.adjustVolume(-5),
-        const SingleActivator(LogicalKeyboardKey.keyM): () => _player.toggleMute(),
-        const SingleActivator(LogicalKeyboardKey.keyF): () => _shell.toggleFullscreen(),
-        const SingleActivator(LogicalKeyboardKey.escape): () => _shell.exitFullscreen(),
-        const SingleActivator(LogicalKeyboardKey.keyO, control: true): () => _open(),
-        const SingleActivator(LogicalKeyboardKey.keyS): () => _player.screenshot(),
-        const SingleActivator(LogicalKeyboardKey.keyT, control: true): () => _shell.toggleAlwaysOnTop(),
-      };
+    const SingleActivator(LogicalKeyboardKey.space): () => _player.togglePlay(),
+    const SingleActivator(LogicalKeyboardKey.arrowRight): () => _player.seekRelative(const Duration(seconds: 3)),
+    const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _player.seekRelative(const Duration(seconds: -3)),
+    const SingleActivator(LogicalKeyboardKey.arrowRight, shift: true): () => _player.frameStep(forward: true),
+    const SingleActivator(LogicalKeyboardKey.arrowLeft, shift: true): () => _player.frameStep(forward: false),
+    const SingleActivator(LogicalKeyboardKey.arrowUp): () => _player.adjustVolume(5),
+    const SingleActivator(LogicalKeyboardKey.arrowDown): () => _player.adjustVolume(-5),
+    const SingleActivator(LogicalKeyboardKey.keyM): () => _player.toggleMute(),
+    const SingleActivator(LogicalKeyboardKey.keyF): () => _shell.toggleFullscreen(),
+    const SingleActivator(LogicalKeyboardKey.escape): () => _shell.exitFullscreen(),
+    const SingleActivator(LogicalKeyboardKey.keyO, control: true): () => _open(),
+    const SingleActivator(LogicalKeyboardKey.keyS): () => _player.screenshot(),
+    const SingleActivator(LogicalKeyboardKey.keyT, control: true): () => _shell.toggleAlwaysOnTop(),
+    const SingleActivator(LogicalKeyboardKey.keyE, includeRepeats: false): () => _studio?.toggle(),
+    const SingleActivator(LogicalKeyboardKey.keyI): () => _inStudio((s) => s.markIn()),
+    const SingleActivator(LogicalKeyboardKey.keyO): () => _inStudio((s) => s.markOut()),
+    const SingleActivator(LogicalKeyboardKey.keyR, includeRepeats: false): () => _inStudio((s) => s.cycleRotation()),
+    const SingleActivator(LogicalKeyboardKey.keyC, includeRepeats: false): () => _inStudio((s) => s.toggleCrop()),
+    const SingleActivator(LogicalKeyboardKey.keyE, control: true): () => _inStudio((s) => s.export()),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -149,16 +205,31 @@ class _AppShellState extends State<AppShell> {
           child: DropTarget(
             onDragDone: (details) => handleDroppedPaths([for (final f in details.files) f.path], _player),
             child: ListenableBuilder(
-              listenable: Listenable.merge([_player, _shell, _visibility]),
-              builder: (context, _) => ColoredBox(
-                color: UhfColors.ink,
-                child: Column(
-                  children: [
-                    if (!_shell.fullscreen) TitleBar(shell: _shell, fileName: _player.fileName, onOpen: _open),
-                    Expanded(child: _stage(context)),
-                  ],
-                ),
-              ),
+              listenable: Listenable.merge([_player, _shell, _visibility, ?_studio]),
+              builder: (context, _) {
+                final studio = _studio;
+                final docked = studio != null && studio.isOpen && _player.hasMedia && !_shell.fullscreen;
+                return ColoredBox(
+                  color: UhfColors.ink,
+                  child: Column(
+                    children: [
+                      if (!_shell.fullscreen) TitleBar(shell: _shell, fileName: _player.fileName, onOpen: _open),
+                      Expanded(child: _stage(context)),
+                      if (docked) ...[
+                        ControlsOverlay(
+                          player: _player,
+                          shell: _shell,
+                          settings: widget.settings,
+                          visibility: _studioVisibility,
+                          onMenuOpenChanged: _onMenuOpenChanged,
+                          studio: studio,
+                        ),
+                        StudioPanel(studio: studio, player: _player, onMenuOpenChanged: _onMenuOpenChanged),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -167,7 +238,8 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _stage(BuildContext context) {
-    final hidden = _player.hasMedia && !_visibility.visible;
+    final studio = _studio;
+    final hidden = _player.hasMedia && !_studioOpen && !_visibility.visible;
     return MouseRegion(
       cursor: hidden ? SystemMouseCursors.none : MouseCursor.defer,
       onHover: (_) => _visibility.poke(),
@@ -181,14 +253,12 @@ class _AppShellState extends State<AppShell> {
                   _player.adjustVolume(signal.scrollDelta.dy < 0 ? 5 : -5);
                 }
               },
-              child: GestureDetector(
-                onDoubleTap: _shell.toggleFullscreen,
-                child: widget.videoBuilder(context),
-              ),
+              child: GestureDetector(onDoubleTap: _shell.toggleFullscreen, child: widget.videoBuilder(context)),
             )
           else
             const IdleScreen(),
-          if (_player.hasMedia)
+          if (_player.hasMedia && studio != null && studio.isOpen && studio.cropEnabled) _cropLayer(studio),
+          if (_player.hasMedia && !(_studioOpen && !_shell.fullscreen))
             Positioned(
               left: 0,
               right: 0,
@@ -199,6 +269,7 @@ class _AppShellState extends State<AppShell> {
                 settings: widget.settings,
                 visibility: _visibility,
                 onMenuOpenChanged: _onMenuOpenChanged,
+                studio: studio,
               ),
             ),
           ToastHost(controller: widget.toasts),
@@ -206,4 +277,32 @@ class _AppShellState extends State<AppShell> {
       ),
     );
   }
+
+  /// The crop frame sits exactly on the picture, letterboxed like the video.
+  Widget _cropLayer(StudioController studio) => LayoutBuilder(
+    builder: (context, constraints) {
+      final picture = studio.pictureSize;
+      final rect = picture == null
+          ? null
+          : CropMath.videoRectInViewport(picture, Rotation.none, constraints.maxWidth, constraints.maxHeight);
+      if (rect == null) return const SizedBox.shrink();
+      final out = studio.outputSize;
+      return Stack(
+        children: [
+          Positioned(
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            child: CropOverlay(
+              crop: studio.crop,
+              lockRatio: studio.cropLockRatio,
+              label: out == null ? '' : '${out.width} × ${out.height} · ${reducedRatio(out.width, out.height)}',
+              onChanged: studio.setCrop,
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }

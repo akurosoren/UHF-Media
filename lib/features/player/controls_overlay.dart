@@ -9,6 +9,7 @@ import '../../ui/uhf_icon_button.dart';
 import '../../ui/uhf_menu.dart';
 import '../settings/settings_controller.dart';
 import '../shell/shell_controller.dart';
+import '../studio/studio_controller.dart';
 import 'controls_visibility.dart';
 import 'player_controller.dart';
 import 'player_menus.dart';
@@ -24,6 +25,7 @@ class ControlsOverlay extends StatelessWidget {
     required this.settings,
     required this.visibility,
     required this.onMenuOpenChanged,
+    this.studio,
   });
 
   final PlayerController player;
@@ -31,13 +33,15 @@ class ControlsOverlay extends StatelessWidget {
   final SettingsController settings;
   final ControlsVisibility visibility;
   final ValueChanged<bool> onMenuOpenChanged;
+  final StudioController? studio;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([player, shell, settings, visibility]),
+      listenable: Listenable.merge([player, shell, settings, visibility, ?studio]),
       builder: (context, _) {
         final l = AppLocalizations.of(context);
+        final studio = this.studio;
         return IgnorePointer(
           key: const Key('controls-ignore'),
           ignoring: !visibility.visible,
@@ -93,6 +97,13 @@ class ControlsOverlay extends StatelessWidget {
                         ),
                         onOpenChanged: onMenuOpenChanged,
                       ),
+                      if (studio != null)
+                        UhfIconButton(
+                          icon: Symbols.movie_edit_sharp,
+                          tooltip: l.tooltipStudio,
+                          active: studio.isOpen,
+                          onPressed: studio.available ? studio.toggle : null,
+                        ),
                       UhfIconButton(
                         icon: shell.fullscreen ? Symbols.fullscreen_exit_sharp : Symbols.fullscreen_sharp,
                         tooltip: shell.fullscreen ? l.tooltipExitFullscreen : l.tooltipFullscreen,
