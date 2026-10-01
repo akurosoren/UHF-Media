@@ -7,6 +7,7 @@ import '../../core/geometry/aspect_preset.dart';
 import '../../core/geometry/crop_math.dart';
 import '../../core/geometry/geometry.dart';
 import '../../core/geometry/rotation.dart';
+import '../../core/system/export_runner.dart';
 import '../../core/system/export_service.dart';
 import '../player/player_controller.dart';
 import 'trim_selection.dart';
@@ -50,9 +51,10 @@ class ExportProgress {
 }
 
 class StudioController extends ChangeNotifier {
-  StudioController({required PlayerController player, required Exporter exporter})
+  StudioController({required PlayerController player, required Exporter exporter, DateTime Function()? now})
       : _player = player,
-        _exporter = exporter {
+        _exporter = exporter,
+        _now = now ?? DateTime.now {
     _path = player.path;
     player.addListener(_onPlayerChanged);
   }
@@ -61,7 +63,11 @@ class StudioController extends ChangeNotifier {
 
   final PlayerController _player;
   final Exporter _exporter;
+  final DateTime Function() _now;
   final _events = StreamController<StudioEvent>.broadcast();
+  ExportProgress? _export;
+  DateTime? _exportStarted;
+  Future<void>? _exportFuture;
 
   String? _path;
   bool _open = false;
@@ -82,6 +88,8 @@ class StudioController extends ChangeNotifier {
   AspectPreset? get cropPreset => _cropPreset;
   RatioRect get crop => _crop;
   double? get cropLockRatio => _cropPreset?.ratio;
+  bool get exporting => _export != null;
+  ExportProgress? get exportProgress => _export;
 
   /// Unrotated picture size: ffprobe's coded size, else the engine's.
   IntSize? get _sourceSize => _player.probe?.videoSize ?? _player.videoSize;
@@ -218,6 +226,85 @@ class StudioController extends ChangeNotifier {
   RatioRect _fit(AspectPreset preset) {
     final picture = pictureSize;
     return picture == null ? CropMath.defaultCrop : CropMath.fitPreset(preset, picture);
+  }
+
+  // Export --------------------------------------------------------------
+
+  Future<void> export() {
+    final running = _exportFuture;
+    if (running != null) return running;
+    final future = _runExport();
+    _exportFuture = future;
+    return future.whenComplete(() => _exportFuture = null);
+  }
+
+  Future<void> _runExport() async {
+    final path = _player.path;
+    if (path == null) return;
+    if (rotation == Rotation.none && !cropEnabled && _trim == null) {
+      _events.add(const ExportRejectedEvent(ExportPlanError.noChanges));
+      return;
+    }
+    final probe = _player.probe;
+    if (!_exporter.available || probe == null) {
+      _events.add(FfmpegMissingEvent(_exporter.expectedFolder));
+      return;
+    }
+    final source = probe.videoSize ?? _sourceSize;
+    final input = ExportInput(
+      inputPath: path,
+      probe: probe,
+      rotation: rotation,
+      crop: cropEnabled && source != null ? CropMath.displayToSource(_crop, rotation, source) : null,
+      trim: _trim?.range,
+      videoFfIndex: _player.videoFfIndex,
+      audioFfIndex: _player.audioFfIndex,
+    );
+
+    await _player.pause();
+    _exportStarted = _now();
+    _export = const ExportProgress(0, null);
+    notifyListeners();
+    try {
+      final outcome = await _exporter.export(
+        input,
+        onProgress: _onProgress,
+        onCpuRetry: () => _events.add(const ExportRetriedOnCpuEvent()),
+      );
+      _events.add(switch (outcome) {
+        ExportSucceeded(:final outputPath) => ExportFinishedEvent(outputPath),
+        ExportCancelled() => const ExportCancelledEvent(),
+        ExportFailed(:final log) => ExportFailedEvent(log),
+      });
+    } on ExportPlanException catch (e) {
+      _events.add(ExportRejectedEvent(e.error));
+    } finally {
+      _export = null;
+      _exportStarted = null;
+      notifyListeners();
+    }
+  }
+
+  void _onProgress(double fraction) {
+    final started = _exportStarted;
+    if (started == null) return;
+    final elapsed = _now().difference(started);
+    final remaining = fraction > 0.01
+        ? Duration(microseconds: (elapsed.inMicroseconds * (1 - fraction) / fraction).round())
+        : null;
+    _export = ExportProgress(fraction, remaining);
+    notifyListeners();
+  }
+
+  void cancelExport() => _exporter.cancel();
+
+  /// On app close: stops a running export and waits (3 s at most) for
+  /// ffmpeg to quit and the partial file to be removed.
+  Future<void> shutdown() async {
+    final running = _exportFuture;
+    if (running == null) return;
+    _exporter.cancel();
+    await running.timeout(const Duration(seconds: 3), onTimeout: () {});
   }
 
   @override
