@@ -133,6 +133,21 @@ void main() {
     await finish(tester);
   });
 
+  testWidgets('switching to an audio file hides the open studio (final review)', (tester) async {
+    await pumpShell(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyE);
+    await tester.pump();
+    expect(find.byType(StudioPanel), findsOneWidget);
+    // Opening saves the resume file for real: let that IO finish.
+    await tester.runAsync(() => player.open(r'C:\m\song.mp3'));
+    await tester.pump();
+    expect(find.byType(StudioPanel), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyR);
+    await tester.pump();
+    expect(engine.calls, isNot(contains('video-rotate 90')));
+    await finish(tester);
+  });
+
   testWidgets('an audio file has no studio (review focus 4)', (tester) async {
     await pumpShell(tester, withPicture: false);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyE);

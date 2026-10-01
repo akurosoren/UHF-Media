@@ -75,7 +75,15 @@ class _AppShellState extends State<AppShell> {
   StreamSubscription<MusicEvent>? _musicEvents;
 
   StudioController? get _studio => widget.studio;
-  bool get _studioOpen => _studio?.isOpen ?? false;
+  bool get _studioOpen => _studioShown;
+
+  /// The panel stays open across files but shows only for a file with a
+  /// picture (or while an export of a previous file is still running).
+  bool get _studioShown {
+    final studio = _studio;
+    return studio != null && studio.isOpen && _player.hasMedia && (studio.available || studio.exporting);
+  }
+
   late final StreamSubscription<PlayerEvent> _events;
   bool _menuOpen = false;
   String? _shownFile;
@@ -179,7 +187,7 @@ class _AppShellState extends State<AppShell> {
 
   void _inStudio(void Function(StudioController studio) action) {
     final studio = _studio;
-    if (studio != null && studio.isOpen) action(studio);
+    if (studio != null && _studioShown) action(studio);
   }
 
   Future<void> _open() async {
@@ -229,7 +237,7 @@ class _AppShellState extends State<AppShell> {
               listenable: Listenable.merge([_player, _shell, _visibility, ?_studio]),
               builder: (context, _) {
                 final studio = _studio;
-                final docked = studio != null && studio.isOpen && _player.hasMedia && !_shell.fullscreen;
+                final docked = studio != null && _studioShown && !_shell.fullscreen;
                 return ColoredBox(
                   color: UhfColors.ink,
                   child: Column(
@@ -279,7 +287,7 @@ class _AppShellState extends State<AppShell> {
             )
           else
             const IdleScreen(),
-          if (_player.hasMedia && studio != null && studio.isOpen && studio.cropEnabled) _cropLayer(studio),
+          if (studio != null && _studioShown && studio.cropEnabled) _cropLayer(studio),
           if (_player.hasMedia && !(_studioOpen && !_shell.fullscreen))
             Positioned(
               left: 0,
