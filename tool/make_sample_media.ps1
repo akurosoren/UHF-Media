@@ -34,4 +34,18 @@ External subtitle line
 
 "@ | Set-Content -Encoding utf8 (Join-Path $out 'multi_track.fr.srt')
 
+# 20 s vertical phone video (1080x1920, 30 fps, AAC).
+ffmpeg -y -v error -f lavfi -i "testsrc2=size=1080x1920:rate=30:duration=20" `
+  -f lavfi -i "sine=frequency=660:duration=20" `
+  -c:v libx264 -preset veryfast -c:a aac (Join-Path $out 'phone_vertical.mp4')
+
+# 20 s HEVC 10-bit (never encoded on the GPU).
+ffmpeg -y -v error -f lavfi -i "testsrc2=size=1920x1080:rate=25:duration=20" `
+  -c:v libx265 -x265-params log-level=error -pix_fmt yuv420p10le -preset ultrafast (Join-Path $out 'hevc_10bit.mkv')
+
+# 20 s Blu-ray style m2ts with LPCM audio (re-encoded to FLAC in mkv).
+ffmpeg -y -v error -f lavfi -i "testsrc2=size=1920x1080:rate=25:duration=20" `
+  -f lavfi -i "sine=frequency=440:duration=20" `
+  -c:v libx264 -preset veryfast -c:a pcm_bluray -ac 2 (Join-Path $out 'bluray_lpcm.m2ts')
+
 Get-ChildItem $out | Select-Object Name, Length
