@@ -6,8 +6,9 @@ feature powered by [Shazam](https://www.shazam.com/) (via
 [`shazamio`](https://github.com/dotX12/ShazamIO)).
 
 Click the 🎵 button while any video or audio file is open, and the app will
-sample ~10 seconds of audio from the middle of the file, send it to Shazam,
-and — if it gets a match — rename the file to `Artist - Title.ext` on disk.
+sample ~10 seconds of audio from the current playback position, send it to
+Shazam, and show the result. If the **auto-rename** checkbox (✓, off by default) is ticked and
+there is a match, the file is also renamed to `Artist - Title.ext` on disk.
 If the track isn't recognized (or anything goes wrong), **the file is left
 completely untouched**.
 
@@ -108,12 +109,16 @@ python -m PyInstaller --onedir --windowed --name VideoStudioPlayer --icon=app.ic
 These are external binaries, not Python packages — copy them manually into
 `dist\VideoStudioPlayer\` after building:
 
-- `ffmpeg.exe`
-- `ffprobe.exe`
-- `libmpv-2.dll`
+- `ffmpeg.exe` → next to `VideoStudioPlayer.exe`
+- `ffprobe.exe` → next to `VideoStudioPlayer.exe`
+- `libmpv-2.dll` → **both** next to `VideoStudioPlayer.exe` **and** inside
+  `dist\VideoStudioPlayer\_internal\`
 
-Without them, playback may still work depending on how libmpv is resolved,
-but export and song‑recognition will fail.
+With only the first copy of `libmpv-2.dll`, the exe may fail at startup with
+`OSError: Cannot find mpv-1.dll, mpv-2.dll or libmpv-2.dll`. Without the
+ffmpeg binaries, export and song‑recognition fail.
+
+These three files are listed in `.gitignore` and are not part of the repo.
 
 ### Distributing the app
 
@@ -130,15 +135,17 @@ Windows 10/11 systems already have it.
 
 1. Click the 🎵 button (next to the screenshot button in the bottom
    controls).
-2. The app reads the current file's duration from `mpv`. If it's longer than
-   30 seconds, it seeks to the midpoint; otherwise it reads from the start.
+2. The app reads the current playback position from `mpv` and extracts audio
+   starting there.
 3. ~10 seconds of stereo PCM audio is extracted with `ffmpeg` and checked for
    silence (very quiet clips are skipped, not sent to Shazam).
 4. The audio is sent to Shazam via `shazamio`, in a background thread so the
    UI never freezes.
-5. **Match found:** the file is renamed to `Artist - Title.ext` (name
-   collisions get a `(1)`, `(2)`, … suffix). Playback is not interrupted —
-   only the app's internal path tracking and the window title are updated.
+5. **Match found:** the result is shown in the status bar. If auto-rename is
+   ticked, the file is renamed to `Artist - Title.ext` (name collisions get a
+   `(1)`, `(2)`, … suffix). Playback is not interrupted — only the app's
+   internal path tracking and the window title are updated. On Windows the
+   rename can fail if the file is locked; the file is then left untouched.
 6. **No match, silence, or any error:** nothing on disk is touched; the
    status bar reports what happened.
 
@@ -151,7 +158,7 @@ Windows 10/11 systems already have it.
 | `ModuleNotFoundError: No module named 'audioop'` / `'pyaudioop'` | `pip install audioop-lts` (Python 3.13 only) |
 | Icon build error: `FileNotFoundError: Icon input file ... not found` | Make sure `app.ico` exists in the folder you're running PyInstaller from, or drop `--icon=app.ico` from the command |
 | `pyinstaller: error: the following arguments are required: scriptname` | You forgot to pass the script filename — run the command from the folder containing `video_studio_player.py` and include it at the end of the command |
-| App builds but can't play video / export / recognize songs | Copy `ffmpeg.exe`, `ffprobe.exe`, and `libmpv-2.dll` into the `dist\VideoStudioPlayer\` folder next to the `.exe` |
+| App builds but can't play video / export / recognize songs | Copy `ffmpeg.exe`, `ffprobe.exe`, and `libmpv-2.dll` into `dist\VideoStudioPlayer\` next to the `.exe`, and copy `libmpv-2.dll` into `dist\VideoStudioPlayer\_internal\` too |
 
 ## License
 
