@@ -33,6 +33,53 @@ ThemeData buildUhfTheme() {
     focusColor: Colors.transparent,
     visualDensity: VisualDensity.compact,
     dividerColor: UhfColors.line,
+    menuTheme: MenuThemeData(
+      style: MenuStyle(
+        backgroundColor: const WidgetStatePropertyAll(UhfColors.raised),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        shadowColor: const WidgetStatePropertyAll(Colors.transparent),
+        elevation: const WidgetStatePropertyAll(0),
+        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 4)),
+        shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(UhfRadii.md),
+          side: const BorderSide(color: UhfColors.line),
+        )),
+      ),
+    ),
+    menuButtonTheme: MenuButtonThemeData(
+      style: ButtonStyle(
+        textStyle: WidgetStatePropertyAll(UhfText.body),
+        foregroundColor: const WidgetStatePropertyAll(UhfColors.text),
+        overlayColor: WidgetStatePropertyAll(UhfColors.text.withValues(alpha: 0.06)),
+        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
+        minimumSize: const WidgetStatePropertyAll(Size(0, 30)),
+        iconColor: const WidgetStatePropertyAll(UhfColors.text),
+      ),
+    ),
+    sliderTheme: const SliderThemeData(
+      trackHeight: 2,
+      activeTrackColor: UhfColors.text,
+      inactiveTrackColor: UhfColors.line,
+      thumbColor: UhfColors.text,
+      overlayShape: RoundSliderOverlayShape(overlayRadius: 0),
+      thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5, elevation: 0, pressedElevation: 0),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: UhfColors.raised,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(UhfRadii.md),
+        side: const BorderSide(color: UhfColors.line),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: UhfColors.text,
+        textStyle: UhfText.label,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(UhfRadii.sm)),
+      ),
+    ),
     tooltipTheme: TooltipThemeData(
       waitDuration: const Duration(milliseconds: 500),
       decoration: BoxDecoration(
