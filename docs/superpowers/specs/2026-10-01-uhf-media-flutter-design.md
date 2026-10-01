@@ -102,8 +102,8 @@ Risques connus :
 ## 5. Améliorations et corrections par rapport au Python
 
 - Renommage pendant la lecture : si Windows refuse (fichier ouvert par le lecteur), le lecteur ferme le fichier, renomme, puis rouvre à la même position et dans le même état de lecture.
-- Conteneur de sortie : `.mp4` pour les sources mp4, mov, m4v ; `.mkv` pour toutes les autres (H.264 n'est pas valide en webm).
-- Sous-titres en sortie mp4 : pistes texte converties en `mov_text`, pistes image (PGS, VobSub) ignorées ; en mkv, copie.
+- Conteneur de sortie : extension d'origine conservée pour les sources mp4, mov, m4v (famille MP4 ; `.mov` accepte l'audio PCM des caméras, que `.mp4` refuse) ; `.mkv` pour toutes les autres (H.264 n'est pas valide en webm).
+- Sous-titres en sortie famille MP4 : pistes texte converties en `mov_text`, pistes image (PGS, VobSub) ignorées ; en mkv, copie.
 - Suffixes de sortie neutres : `_crop`, `_rot90`, `_rot270`, `_rot180`, `_trim`, combinés dans cet ordre ; suffixe ` (n)` si le fichier existe.
 - Progression réelle de l'export (`-progress pipe:1`) avec pourcentage, temps restant et annulation, sans fenêtre modale.
 - Fichiers de sous-titres externes acceptés : `.srt`, `.ass`, `.ssa`, `.vtt`.
