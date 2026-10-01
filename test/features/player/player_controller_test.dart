@@ -99,6 +99,20 @@ void main() {
     expect(c.position, Duration.zero);
   });
 
+  test('a failing resume save does not block opening the next file', () async {
+    // resume.json cannot be written: its folder path goes through a file.
+    final blocker = File('${dir.path}/blocker')..writeAsStringSync('');
+    resume = ResumeStore(Directory('${blocker.path}/sub'));
+    final c = make();
+    await c.open(r'C:\v\a.mkv');
+    engine.emitDuration(const Duration(hours: 1));
+    engine.emitPosition(const Duration(minutes: 20));
+    await settle();
+    await c.open(r'C:\v\b.mkv');
+    expect(engine.calls, contains(r'open C:\v\b.mkv'));
+    expect(c.fileName, 'b.mkv');
+  });
+
   test('positions are recorded every 5 seconds', () async {
     final c = make();
     await c.open(r'C:\v\a.mkv');

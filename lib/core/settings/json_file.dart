@@ -34,5 +34,12 @@ Future<void> _write(File file, Map<String, dynamic> json) async {
   await file.parent.create(recursive: true);
   final tmp = File('${file.path}.tmp');
   await tmp.writeAsString(const JsonEncoder.withIndent('  ').convert(json), flush: true);
-  await tmp.rename(file.path);
+  try {
+    await tmp.rename(file.path);
+  } on FileSystemException {
+    // Virtualized AppData (packaged parent process) can refuse the rename
+    // with ERROR_NOT_SAME_DEVICE; copying over the target still works.
+    await tmp.copy(file.path);
+    await tmp.delete();
+  }
 }

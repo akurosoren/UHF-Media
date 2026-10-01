@@ -40,6 +40,15 @@ void main() {
     expect(File('${dir.path}/resume.json').existsSync(), isTrue);
   });
 
+  test('a failed flush is retried by the next one', () async {
+    final blocker = File('${dir.path}/blocker')..writeAsStringSync('');
+    final s = ResumeStore(Directory('${blocker.path}/sub'))..record(r'C:\v\a.mkv', const Duration(minutes: 3));
+    await expectLater(s.flush(), throwsA(isA<FileSystemException>()));
+    blocker.deleteSync();
+    await s.flush();
+    expect(File('${blocker.path}/sub/resume.json').existsSync(), isTrue);
+  });
+
   test('persists across instances', () async {
     final a = store()..record(r'C:\v\a.mkv', const Duration(minutes: 3));
     await a.flush();

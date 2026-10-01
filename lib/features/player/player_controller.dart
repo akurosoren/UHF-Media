@@ -260,10 +260,15 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> restartFromBeginning() => _engine.seek(Duration.zero);
 
+  /// Best effort: a resume file that cannot be written never blocks playback.
   Future<void> saveResume() async {
     final path = _path;
     if (path != null && _position > Duration.zero) _resume.record(path, _position);
-    await _resume.flush();
+    try {
+      await _resume.flush();
+    } on Exception {
+      // Keep the entry in memory; the next flush retries.
+    }
   }
 
   Future<void> close() async {

@@ -71,12 +71,17 @@ class ResumeStore {
   Future<void> flush() async {
     if (!_dirty) return;
     _dirty = false;
-    await writeJsonAtomic(_file, {
-      'version': 1,
-      'entries': {
-        for (final e in _entries.entries) e.key: {'pos_ms': e.value.positionMs, 'updated': e.value.updatedMs},
-      },
-    });
+    try {
+      await writeJsonAtomic(_file, {
+        'version': 1,
+        'entries': {
+          for (final e in _entries.entries) e.key: {'pos_ms': e.value.positionMs, 'updated': e.value.updatedMs},
+        },
+      });
+    } on Exception {
+      _dirty = true;
+      rethrow;
+    }
   }
 
   void _trim() {
