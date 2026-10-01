@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/shell/idle_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../ui/theme.dart';
 
@@ -25,7 +26,7 @@ class UhfApp extends StatelessWidget {
         }
         return const Locale('en');
       },
-      home: Scaffold(body: home ?? const SizedBox.expand()),
+      home: Scaffold(body: home ?? const IdleScreen()),
     );
   }
 }

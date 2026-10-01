@@ -8,5 +8,6 @@ void main() {
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.title, 'UHF Media');
     expect(app.debugShowCheckedModeBanner, isFalse);
+    await tester.pumpWidget(const SizedBox());
   });
 }
