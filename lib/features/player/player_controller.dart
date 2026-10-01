@@ -84,6 +84,9 @@ class PlayerController extends ChangeNotifier {
   final _events = StreamController<PlayerEvent>.broadcast();
 
   String? _path;
+
+  /// File to reopen if the one being opened turns out unreadable (spec §9).
+  String? _fallbackPath;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   Duration _lastRecorded = Duration.zero;
@@ -120,6 +123,7 @@ class PlayerController extends ChangeNotifier {
       return;
     }
     await saveResume();
+    _fallbackPath = _path;
     _path = path;
     _position = Duration.zero;
     _duration = Duration.zero;
@@ -142,10 +146,14 @@ class PlayerController extends ChangeNotifier {
   }
 
   void _failOpen(String path) {
+    final fallback = _fallbackPath;
+    _fallbackPath = null;
     _path = null;
     _pendingResume = false;
     notifyListeners();
     _events.add(OpenFailedEvent(path));
+    // The previous file stays open: reopen it at the position just saved.
+    if (fallback != null && fallback != path) unawaited(open(fallback));
   }
 
   void _onError(String _) {
@@ -155,6 +163,7 @@ class PlayerController extends ChangeNotifier {
 
   void _onDuration(Duration d) {
     _duration = d;
+    if (d > Duration.zero) _fallbackPath = null;
     final path = _path;
     if (_pendingResume && path != null && d > Duration.zero) {
       _pendingResume = false;
@@ -173,6 +182,9 @@ class PlayerController extends ChangeNotifier {
     if (path != null && (position - _lastRecorded).abs() >= _recordEvery) {
       _lastRecorded = position;
       _resume.record(path, position);
+      // Spec §4.4: saved every 5 s, so a crash or a Windows shutdown loses
+      // at most that much.
+      unawaited(_flushResume());
     }
     notifyListeners();
   }
@@ -264,6 +276,10 @@ class PlayerController extends ChangeNotifier {
   Future<void> saveResume() async {
     final path = _path;
     if (path != null && _position > Duration.zero) _resume.record(path, _position);
+    await _flushResume();
+  }
+
+  Future<void> _flushResume() async {
     try {
       await _resume.flush();
     } on Exception {

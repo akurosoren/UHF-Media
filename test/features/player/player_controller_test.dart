@@ -44,7 +44,19 @@ void main() {
     resume = ResumeStore(dir);
     events = [];
   });
-  tearDown(() => dir.deleteSync(recursive: true));
+  // Resume positions are flushed in the background: retry while a write
+  // still holds a file open.
+  tearDown(() async {
+    for (var i = 0;; i++) {
+      try {
+        dir.deleteSync(recursive: true);
+        return;
+      } on FileSystemException {
+        if (i == 50) rethrow;
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    }
+  });
 
   test('open resets pan, turns subtitles off via the engine and applies subtitle style', () async {
     final c = make();
@@ -111,6 +123,40 @@ void main() {
     await c.open(r'C:\v\b.mkv');
     expect(engine.calls, contains(r'open C:\v\b.mkv'));
     expect(c.fileName, 'b.mkv');
+  });
+
+  test('recorded positions reach the disk without a file change or a close (final review)', () async {
+    final c = make();
+    await c.open(r'C:\v\a.mkv');
+    engine.emitDuration(const Duration(hours: 1));
+    engine.emitPosition(const Duration(minutes: 20));
+    await settle();
+    final onDisk = ResumeStore(dir);
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    Duration? saved;
+    while (saved == null && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await onDisk.load();
+      saved = onDisk.resumePositionFor(r'C:\v\a.mkv', const Duration(hours: 1));
+    }
+    expect(saved, const Duration(minutes: 20));
+  });
+
+  test('an unreadable file keeps the previous one open at its position (final review)', () async {
+    final c = make();
+    await c.open(r'C:\v\a.mkv');
+    engine.emitDuration(const Duration(hours: 1));
+    engine.emitPosition(const Duration(minutes: 20));
+    await settle();
+    await c.open(r'C:\v\bad.mkv');
+    engine.emitError('Failed to recognize file format.');
+    await settle();
+    expect(events.whereType<OpenFailedEvent>().single.path, r'C:\v\bad.mkv');
+    expect(c.fileName, 'a.mkv');
+    expect(engine.calls.where((x) => x.startsWith('open')).last, r'open C:\v\a.mkv');
+    engine.emitDuration(const Duration(hours: 1));
+    await settle();
+    expect(engine.calls, contains('seek ${const Duration(minutes: 20).inMilliseconds}'));
   });
 
   test('positions are recorded every 5 seconds', () async {
