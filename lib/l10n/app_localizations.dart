@@ -111,6 +111,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drop a video here · Ctrl+O'**
   String get idleHint;
+
+  /// No description provided for @tooltipOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open (Ctrl+O)'**
+  String get tooltipOpen;
+
+  /// No description provided for @tooltipPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Always on top (Ctrl+T)'**
+  String get tooltipPin;
+
+  /// No description provided for @tooltipMinimize.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimize'**
+  String get tooltipMinimize;
+
+  /// No description provided for @tooltipMaximize.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximize'**
+  String get tooltipMaximize;
+
+  /// No description provided for @tooltipRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get tooltipRestore;
+
+  /// No description provided for @tooltipClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get tooltipClose;
+
+  /// No description provided for @tooltipPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play (Space)'**
+  String get tooltipPlay;
+
+  /// No description provided for @tooltipPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause (Space)'**
+  String get tooltipPause;
+
+  /// No description provided for @tooltipMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute (M)'**
+  String get tooltipMute;
+
+  /// No description provided for @tooltipUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute (M)'**
+  String get tooltipUnmute;
+
+  /// No description provided for @tooltipAudioTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio track'**
+  String get tooltipAudioTrack;
+
+  /// No description provided for @tooltipSubtitles.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitles'**
+  String get tooltipSubtitles;
+
+  /// No description provided for @tooltipMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get tooltipMore;
+
+  /// No description provided for @tooltipFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen (F)'**
+  String get tooltipFullscreen;
+
+  /// No description provided for @tooltipExitFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit fullscreen (Esc)'**
+  String get tooltipExitFullscreen;
+
+  /// No description provided for @subtitlesOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get subtitlesOff;
+
+  /// No description provided for @trackNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Track {number}'**
+  String trackNumber(int number);
+
+  /// No description provided for @menuScreenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot'**
+  String get menuScreenshot;
+
+  /// No description provided for @menuMonoLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Mono from left channel'**
+  String get menuMonoLeft;
+
+  /// No description provided for @menuMonoRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Mono from right channel'**
+  String get menuMonoRight;
+
+  /// No description provided for @menuSubtitleSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitle settings…'**
+  String get menuSubtitleSettings;
+
+  /// No description provided for @menuLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get menuLanguage;
+
+  /// No description provided for @languageSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get languageSystem;
+
+  /// No description provided for @subtitleSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get subtitleSize;
+
+  /// No description provided for @subtitlePosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get subtitlePosition;
+
+  /// No description provided for @actionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get actionCancel;
+
+  /// No description provided for @actionApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get actionApply;
+
+  /// No description provided for @actionRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get actionRestart;
+
+  /// No description provided for @actionShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get actionShow;
+
+  /// No description provided for @toastResumed.
+  ///
+  /// In en, this message translates to:
+  /// **'Resumed at {time}'**
+  String toastResumed(String time);
+
+  /// No description provided for @toastScreenshotSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot saved'**
+  String get toastScreenshotSaved;
+
+  /// No description provided for @toastOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open this file'**
+  String get toastOpenFailed;
+
+  /// No description provided for @dialogOpenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a video'**
+  String get dialogOpenTitle;
 }
 
 class _AppLocalizationsDelegate
