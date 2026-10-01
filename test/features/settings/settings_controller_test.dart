@@ -32,6 +32,17 @@ void main() {
     expect(saved, 42);
   });
 
+  test('flush waits for a debounced save already in flight (final review)', () async {
+    final store = SettingsStore(dir);
+    final ctrl = SettingsController(store, AppSettings.defaults(), debounce: Duration.zero);
+    ctrl.update((s) => s.copyWith(volume: 42));
+    // Let the debounce timer fire and start writing.
+    await Future<void>.delayed(Duration.zero);
+    await ctrl.flush();
+    // The app exits right after flush(): the file must already be complete.
+    expect((await store.load()).volume, 42);
+  });
+
   test('an identical value neither notifies nor saves', () async {
     final ctrl = SettingsController(SettingsStore(dir), AppSettings.defaults());
     var notified = 0;

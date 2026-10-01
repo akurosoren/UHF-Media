@@ -30,11 +30,17 @@ class SettingsController extends ChangeNotifier {
     _timer = Timer(debounce, () => unawaited(flush()));
   }
 
+  Future<void> _saving = Future<void>.value();
+
+  /// Saves now if needed, and always waits for a save already in flight: the
+  /// app exits right after flushing on close.
   Future<void> flush() async {
     _timer?.cancel();
-    if (!_dirty) return;
-    _dirty = false;
-    await _store.save(_value);
+    if (_dirty) {
+      _dirty = false;
+      _saving = _saving.catchError((Object _) {}).then((_) => _store.save(_value));
+    }
+    await _saving;
   }
 
   @override
