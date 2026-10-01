@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:window_manager/window_manager.dart';
@@ -64,6 +65,10 @@ class WindowManagerHost with WindowListener implements WindowHost {
       await onCloseRequested?.call();
     } finally {
       await windowManager.destroy();
+      // Native teardown after the message loop ends takes ~6 s (window still
+      // on screen, single-instance mutex still held). Everything is saved by
+      // now, so end the process at once.
+      exit(0);
     }
   }
 
