@@ -77,7 +77,6 @@ void main() {
       '-i', r'C:\v\in.mkv',
       '-filter:v', 'crop=480:540:384:432,transpose=1,format=yuv420p',
       '-map', '0:0', '-map', '0:2',
-      '-map', '0:s?', '-c:s', 'copy',
       '-c:v', 'h264_nvenc', '-b:v', '8000000', '-maxrate', '8000000', '-bufsize', '16000000',
       '-rc:v', 'vbr', '-preset', 'p4',
       '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-map_metadata', '0',
@@ -101,7 +100,6 @@ void main() {
       '-ss', '62.345', '-i', 'in.mkv', '-t', '57.655',
       '-filter:v', 'hflip,vflip',
       '-map', '0:v:0', '-map', '0:a:0?',
-      '-map', '0:s?', '-c:s', 'copy',
       '-c:v', 'libx264', '-b:v', '8000000', '-minrate', '8000000', '-maxrate', '8000000',
       '-bufsize', '16000000', '-preset', 'medium',
       '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-map_metadata', '0',
@@ -207,5 +205,19 @@ void main() {
       expect(pickHwEncoder(' V....D h264_amf  AMD'), HwEncoder.amf);
       expect(pickHwEncoder(' V....D libx264  x264'), isNull);
     });
+  });
+
+  test('mkv output copies only subtitle codecs Matroska accepts', () {
+    final cmd = ExportCommandBuilder.build(
+      const ExportPlan(inputPath: 'in.ts', outputPath: 'out_rot90.mkv', rotation: Rotation.cw90),
+      _probe(subtitles: const [
+        SubtitleStreamInfo(index: 2, codec: 'subrip', isText: true),
+        SubtitleStreamInfo(index: 3, codec: 'dvb_teletext', isText: false),
+        SubtitleStreamInfo(index: 4, codec: 'hdmv_pgs_subtitle', isText: false),
+      ]),
+    );
+    expect(cmd.args, containsAllInOrder(['-map', '0:2', '-map', '0:4', '-c:s', 'copy']));
+    expect(cmd.args, isNot(contains('0:3')));
+    expect(cmd.args, isNot(contains('0:s?')));
   });
 }

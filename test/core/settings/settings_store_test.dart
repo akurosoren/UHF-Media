@@ -60,4 +60,19 @@ void main() {
     expect(s.language, 'system');
     expect(s.muted, isFalse);
   });
+
+  test('non UTF-8 file gives defaults and is kept as .bak', () async {
+    File('${dir.path}/settings.json').writeAsBytesSync([0x7B, 0x22, 0xE9, 0x22, 0x3A, 0x31, 0x7D]);
+    final s = await SettingsStore(dir).load();
+    expect(s.volume, 80);
+    expect(File('${dir.path}/settings.json.bak').existsSync(), isTrue);
+  });
+
+  test('overlapping saves all complete and the last one wins', () async {
+    final store = SettingsStore(dir);
+    await Future.wait([
+      for (var i = 0; i <= 20; i++) store.save(AppSettings.defaults().copyWith(volume: i.toDouble())),
+    ]);
+    expect((await store.load()).volume, 20);
+  });
 }

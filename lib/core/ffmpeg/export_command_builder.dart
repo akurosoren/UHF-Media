@@ -32,6 +32,11 @@ bool _isMp4Family(String path) {
 }
 
 abstract final class ExportCommandBuilder {
+  // Subtitle codecs the Matroska muxer stores as-is (teletext and others are dropped).
+  static const _matroskaSubtitleCodecs = {
+    'subrip', 'srt', 'ass', 'ssa', 'webvtt', 'text', 'hdmv_pgs_subtitle', 'dvd_subtitle', 'dvb_subtitle',
+  };
+
   static const _minTrim = Duration(milliseconds: 100);
 
   static ExportCommand build(ExportPlan plan, ProbeResult probe, {HwEncoder? hwEncoder}) {
@@ -89,7 +94,11 @@ abstract final class ExportCommandBuilder {
       }
       if (textSubs.isNotEmpty) args.addAll(['-c:s', 'mov_text']);
     } else {
-      args.addAll(['-map', '0:s?', '-c:s', 'copy']);
+      final kept = probe.subtitles.where((s) => _matroskaSubtitleCodecs.contains(s.codec)).toList();
+      for (final s in kept) {
+        args.addAll(['-map', '0:${s.index}']);
+      }
+      if (kept.isNotEmpty) args.addAll(['-c:s', 'copy']);
     }
 
     if (useHw) {
