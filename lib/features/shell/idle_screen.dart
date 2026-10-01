@@ -35,23 +35,62 @@ class _IdleScreenState extends State<IdleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: UhfColors.ink,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CustomPaint(
-              size: IdleSignalPainter.logoSize,
-              painter: IdleSignalPainter(barVisible: _barVisible),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(0, -0.2),
+          radius: 0.9,
+          colors: [Color(0xFF151517), UhfColors.ink],
+        ),
+      ),
+      child: CustomPaint(
+        painter: _ScanlinePainter(),
+        child: Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: UhfDurations.slow * 2,
+            curve: UhfCurves.ease,
+            builder: (context, t, child) => Opacity(
+              opacity: t,
+              child: Transform.translate(offset: Offset(0, 10 * (1 - t)), child: child),
             ),
-            const SizedBox(height: 28),
-            Text(AppLocalizations.of(context).idleHint, style: UhfText.caption),
-          ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CustomPaint(
+                  size: IdleSignalPainter.logoSize,
+                  painter: IdleSignalPainter(barVisible: _barVisible),
+                ),
+                const SizedBox(height: 36),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(UhfRadii.lg),
+                    border: Border.all(color: UhfColors.lineStrong),
+                  ),
+                  child: Text(AppLocalizations.of(context).idleHint, style: UhfText.caption.copyWith(fontSize: 12.5)),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+}
+
+/// Faint horizontal lines, like an old television.
+class _ScanlinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0x06FFFFFF);
+    for (var y = 0.0; y < size.height; y += 3) {
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 1), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScanlinePainter old) => false;
 }
 
 class IdleSignalPainter extends CustomPainter {
@@ -79,7 +118,7 @@ class IdleSignalPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final red = Paint()..color = UhfColors.signal;
+    final red = Paint()..color = UhfColors.logoRed;
     var cursorX = 0.0;
     for (final ch in 'UHF'.split('')) {
       final rows = _glyphs[ch]!;

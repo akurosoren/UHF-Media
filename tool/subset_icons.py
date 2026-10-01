@@ -19,6 +19,7 @@ ICONS = [
     'add', 'audiotrack', 'check', 'close', 'content_cut', 'crop', 'folder_open',
     'fullscreen', 'fullscreen_exit', 'more_horiz', 'movie_edit', 'pause',
     'play_arrow', 'push_pin', 'remove', 'subtitles', 'volume_off', 'volume_up',
+    'replay_10', 'forward_10', 'music_note',
 ]
 
 root = Path(__file__).resolve().parent.parent

@@ -56,6 +56,7 @@ void main() {
 
     toasts.show('Resumed at 00:41:12', actionLabel: 'Restart', onAction: () => restarted = true);
     await tester.pump();
+    await tester.pump(UhfDurations.base);
     expect(find.text('Resumed at 00:41:12'), findsOneWidget);
     await tester.tap(find.text('Restart'));
     await tester.pump(UhfDurations.base);
@@ -69,10 +70,10 @@ void main() {
     expect(find.text('Screenshot saved'), findsNothing);
   });
 
-  test('theme styles menus and sliders flat', () {
+  test('theme styles menus and sliders', () {
     final theme = buildUhfTheme();
     expect(theme.menuTheme.style!.backgroundColor!.resolve({}), UhfColors.raised);
-    expect(theme.menuTheme.style!.elevation!.resolve({}), 0);
-    expect(theme.sliderTheme.trackHeight, 2);
+    expect(theme.menuTheme.style!.elevation!.resolve({}), 14);
+    expect(theme.sliderTheme.trackHeight, 4);
   });
 }

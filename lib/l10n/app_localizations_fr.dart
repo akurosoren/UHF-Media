@@ -212,4 +212,13 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get toastRenameFailed => 'Impossible de renommer le fichier';
+
+  @override
+  String get buttonIdentify => 'Identifier';
+
+  @override
+  String get buttonListening => 'Écoute';
+
+  @override
+  String get musicIdentified => 'Identifié';
 }

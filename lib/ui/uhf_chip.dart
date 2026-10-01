@@ -48,12 +48,17 @@ class _UhfChipState extends State<UhfChip> {
           onTap: widget.onPressed,
           child: AnimatedContainer(
             duration: UhfDurations.fast,
-            height: 26,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            curve: UhfCurves.ease,
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: _hover && enabled ? UhfColors.text.withValues(alpha: 0.06) : Colors.transparent,
-              border: Border.all(color: widget.selected ? UhfColors.signal : UhfColors.line),
-              borderRadius: BorderRadius.circular(UhfRadii.sm),
+              color: widget.selected
+                  ? UhfColors.signalSoft
+                  : _hover && enabled
+                      ? UhfColors.text.withValues(alpha: 0.09)
+                      : UhfColors.text.withValues(alpha: 0.04),
+              border: Border.all(color: widget.selected ? UhfColors.signal.withValues(alpha: 0.5) : UhfColors.line),
+              borderRadius: BorderRadius.circular(UhfRadii.pill),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

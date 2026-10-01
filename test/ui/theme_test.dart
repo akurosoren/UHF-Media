@@ -5,14 +5,15 @@ import 'package:uhf_media/ui/tokens.dart';
 import 'package:uhf_media/ui/typography.dart';
 
 void main() {
-  test('tokens hold the exact Signal palette', () {
-    expect(UhfColors.ink, const Color(0xFF0D0D0C));
-    expect(UhfColors.surface, const Color(0xFF161614));
-    expect(UhfColors.raised, const Color(0xFF1F1E1B));
-    expect(UhfColors.line, const Color(0xFF2B2A27));
-    expect(UhfColors.text, const Color(0xFFECE9E2));
-    expect(UhfColors.textMuted, const Color(0xFF8C8981));
-    expect(UhfColors.signal, const Color(0xFFE8412C));
+  test('tokens hold the exact cinema palette', () {
+    expect(UhfColors.ink, const Color(0xFF09090A));
+    expect(UhfColors.surface, const Color(0xFF141416));
+    expect(UhfColors.raised, const Color(0xFF1B1B1E));
+    expect(UhfColors.line, const Color(0x1AFFFFFF));
+    expect(UhfColors.text, const Color(0xFFF2EFE8));
+    expect(UhfColors.textMuted, const Color(0xFF9A968D));
+    expect(UhfColors.signal, const Color(0xFFFF4A2E));
+    expect(UhfColors.logoRed, const Color(0xFFE8412C));
     expect(UhfColors.signalYellow, const Color(0xFFF5D90A));
   });
 

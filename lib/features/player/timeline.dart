@@ -54,30 +54,32 @@ class _TimelineState extends State<Timeline> {
             if (f != null) widget.onSeek(_at(f));
           },
           child: SizedBox(
-            height: 16,
+            height: 22,
             width: width,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
                 Positioned.fill(
-                  child: CustomPaint(
-                    painter: _TimelinePainter(
-                      played: played.clamp(0.0, 1.0),
-                      thick: hoverX != null || _dragFraction != null,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(end: hoverX != null || _dragFraction != null ? 1.0 : 0.0),
+                    duration: UhfDurations.base,
+                    curve: UhfCurves.spring,
+                    builder: (context, grow, _) => CustomPaint(
+                      painter: _TimelinePainter(played: played.clamp(0.0, 1.0), grow: grow),
                     ),
                   ),
                 ),
                 if (hoverX != null && _known)
                   Positioned(
-                    left: (hoverX - 32).clamp(0.0, (width - 64).clamp(0.0, double.infinity)),
-                    bottom: 18,
+                    left: (hoverX - 36).clamp(0.0, (width - 72).clamp(0.0, double.infinity)),
+                    bottom: 26,
                     child: Container(
-                      width: 64,
-                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      width: 72,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       decoration: BoxDecoration(
-                        color: UhfColors.raised,
+                        color: UhfColors.glass,
                         borderRadius: BorderRadius.circular(UhfRadii.sm),
-                        border: Border.all(color: UhfColors.line),
+                        border: Border.all(color: UhfColors.lineStrong),
                       ),
                       child: Text(
                         formatTimecode(_at(fractionOf(hoverX))),
@@ -96,21 +98,36 @@ class _TimelineState extends State<Timeline> {
 }
 
 class _TimelinePainter extends CustomPainter {
-  _TimelinePainter({required this.played, required this.thick});
+  _TimelinePainter({required this.played, required this.grow});
 
   final double played;
-  final bool thick;
+  final double grow;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final h = thick ? 4.0 : 2.0;
+    final h = 3.0 + 3.0 * grow;
     final top = (size.height - h) / 2;
-    canvas.drawRect(Rect.fromLTWH(0, top, size.width, h), Paint()..color = UhfColors.line);
-    final x = size.width * played;
-    canvas.drawRect(Rect.fromLTWH(0, top, x, h), Paint()..color = UhfColors.signal);
-    canvas.drawRect(Rect.fromLTWH(x - 1, (size.height - 11) / 2, 2, 11), Paint()..color = UhfColors.text);
+    final radius = Radius.circular(h / 2);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(0, top, size.width, h), radius),
+      Paint()..color = UhfColors.text.withValues(alpha: 0.18),
+    );
+    final x = (size.width * played).clamp(0.0, size.width);
+    if (x > 0) {
+      final bar = RRect.fromRectAndRadius(Rect.fromLTWH(0, top, x, h), radius);
+      canvas.drawRRect(
+        bar,
+        Paint()
+          ..color = UhfColors.signal.withValues(alpha: 0.55)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+      );
+      canvas.drawRRect(bar, Paint()..color = UhfColors.signal);
+    }
+    if (grow > 0.01) {
+      canvas.drawCircle(Offset(x, size.height / 2), 7 * grow, Paint()..color = UhfColors.text);
+    }
   }
 
   @override
-  bool shouldRepaint(_TimelinePainter old) => old.played != played || old.thick != thick;
+  bool shouldRepaint(_TimelinePainter old) => old.played != played || old.grow != grow;
 }

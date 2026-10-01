@@ -91,6 +91,8 @@ void main() {
     identifier.pending!.complete(outcome);
     await tester.pump();
     await tester.pump();
+    // Let the card finish springing in before the tests tap it.
+    await tester.pump(const Duration(seconds: 1));
   }
 
   testWidgets('Ctrl+I shows the card; Copy puts "Artist - Title" on the clipboard', (tester) async {
@@ -140,7 +142,8 @@ void main() {
     await tester.tap(find.byTooltip('More'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Identify music'));
-    await tester.pumpAndSettle();
+    // The equalizer animates while listening: pumpAndSettle would never end.
+    await tester.pump(const Duration(milliseconds: 300));
     expect(identifier.calls, hasLength(1));
     identifier.pending!.complete(const MusicNotFound());
     await finish(tester);

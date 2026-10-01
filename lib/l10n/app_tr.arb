@@ -63,5 +63,8 @@
   "actionCopy": "Kopyala",
   "actionUndo": "Geri al",
   "toastRenamed": "{name} olarak yeniden adlandırıldı",
-  "toastRenameFailed": "Dosya yeniden adlandırılamadı"
+  "toastRenameFailed": "Dosya yeniden adlandırılamadı",
+  "buttonIdentify": "Tanı",
+  "buttonListening": "Dinleniyor",
+  "musicIdentified": "Tanındı"
 }

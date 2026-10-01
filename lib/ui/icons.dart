@@ -21,4 +21,7 @@ abstract final class UhfIcons {
   static const IconData subtitles = IconData(0xe048, fontFamily: 'UhfIcons');
   static const IconData volume_off = IconData(0xe04f, fontFamily: 'UhfIcons');
   static const IconData volume_up = IconData(0xe050, fontFamily: 'UhfIcons');
+  static const IconData replay_10 = IconData(0xe059, fontFamily: 'UhfIcons');
+  static const IconData forward_10 = IconData(0xe056, fontFamily: 'UhfIcons');
+  static const IconData music_note = IconData(0xe405, fontFamily: 'UhfIcons');
 }

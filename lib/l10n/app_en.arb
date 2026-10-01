@@ -70,5 +70,8 @@
   "actionUndo": "Undo",
   "toastRenamed": "Renamed to {name}",
   "@toastRenamed": { "placeholders": { "name": { "type": "String" } } },
-  "toastRenameFailed": "Couldn't rename the file"
+  "toastRenameFailed": "Couldn't rename the file",
+  "buttonIdentify": "Identify",
+  "buttonListening": "Listening",
+  "musicIdentified": "Identified"
 }

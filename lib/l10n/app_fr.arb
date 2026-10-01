@@ -63,5 +63,8 @@
   "actionCopy": "Copier",
   "actionUndo": "Annuler",
   "toastRenamed": "Renommé en {name}",
-  "toastRenameFailed": "Impossible de renommer le fichier"
+  "toastRenameFailed": "Impossible de renommer le fichier",
+  "buttonIdentify": "Identifier",
+  "buttonListening": "Écoute",
+  "musicIdentified": "Identifié"
 }

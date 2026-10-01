@@ -210,4 +210,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toastRenameFailed => 'Couldn\'t rename the file';
+
+  @override
+  String get buttonIdentify => 'Identify';
+
+  @override
+  String get buttonListening => 'Listening';
+
+  @override
+  String get musicIdentified => 'Identified';
 }

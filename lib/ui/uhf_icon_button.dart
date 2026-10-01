@@ -26,6 +26,7 @@ class UhfIconButton extends StatefulWidget {
 
 class _UhfIconButtonState extends State<UhfIconButton> {
   bool _hover = false;
+  bool _down = false;
 
   @override
   Widget build(BuildContext context) {
@@ -48,15 +49,28 @@ class _UhfIconButtonState extends State<UhfIconButton> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: widget.onPressed,
-            child: AnimatedContainer(
+            onTapDown: (_) => setState(() => _down = true),
+            onTapUp: (_) => setState(() => _down = false),
+            onTapCancel: () => setState(() => _down = false),
+            child: AnimatedScale(
+              scale: _down && enabled ? 0.88 : 1,
               duration: UhfDurations.fast,
-              width: widget.size,
-              height: widget.size,
-              decoration: BoxDecoration(
-                color: _hover && enabled ? UhfColors.text.withValues(alpha: 0.08) : Colors.transparent,
-                borderRadius: BorderRadius.circular(UhfRadii.sm),
+              curve: UhfCurves.spring,
+              child: AnimatedContainer(
+                duration: UhfDurations.fast,
+                curve: UhfCurves.ease,
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  color: widget.active
+                      ? UhfColors.signalSoft
+                      : _hover && enabled
+                          ? UhfColors.text.withValues(alpha: 0.09)
+                          : Colors.transparent,
+                  borderRadius: BorderRadius.circular(UhfRadii.md),
+                ),
+                child: Icon(widget.icon, size: widget.iconSize, weight: 300, color: color),
               ),
-              child: Icon(widget.icon, size: widget.iconSize, weight: 300, color: color),
             ),
           ),
         ),

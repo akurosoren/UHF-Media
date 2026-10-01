@@ -10,7 +10,7 @@ import 'shell_controller.dart';
 class TitleBar extends StatelessWidget {
   const TitleBar({super.key, required this.shell, required this.fileName, required this.onOpen});
 
-  static const double height = 30;
+  static const double height = 36;
 
   final ShellController shell;
   final String? fileName;
@@ -23,13 +23,12 @@ class TitleBar extends StatelessWidget {
       listenable: shell,
       builder: (context, _) => Container(
         height: height,
-        decoration: const BoxDecoration(
-          color: UhfColors.ink,
-          border: Border(bottom: BorderSide(color: UhfColors.surface)),
-        ),
+        color: UhfColors.ink,
         child: Row(
           children: [
-            const SizedBox(width: 4),
+            const SizedBox(width: 10),
+            const _MiniLogo(),
+            const SizedBox(width: 6),
             UhfIconButton(
               icon: UhfIcons.folder_open,
               tooltip: l.tooltipOpen,
@@ -43,10 +42,14 @@ class TitleBar extends StatelessWidget {
                 onPanStart: (_) => shell.startDragging(),
                 onDoubleTap: shell.toggleMaximize,
                 child: Center(
-                  child: Text(
-                    fileName ?? '',
-                    style: UhfText.caption.copyWith(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
+                  child: AnimatedSwitcher(
+                    duration: UhfDurations.base,
+                    child: Text(
+                      fileName ?? '',
+                      key: ValueKey(fileName),
+                      style: UhfText.sans(size: 12.5, color: UhfColors.textMuted),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ),
@@ -71,6 +74,21 @@ class TitleBar extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _MiniLogo extends StatelessWidget {
+  const _MiniLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double h) => Container(
+          width: 3,
+          height: h,
+          margin: const EdgeInsets.only(right: 2),
+          decoration: BoxDecoration(color: UhfColors.signal, borderRadius: BorderRadius.circular(1)),
+        );
+    return Row(crossAxisAlignment: CrossAxisAlignment.end, children: [bar(6), bar(9), bar(12)]);
   }
 }
 

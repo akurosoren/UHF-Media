@@ -39,9 +39,18 @@ class StudioPanel extends StatelessWidget {
           decoration: const BoxDecoration(
             color: UhfColors.surface,
             border: Border(top: BorderSide(color: UhfColors.line)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(UhfRadii.lg + 4)),
           ),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          child: Column(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: UhfDurations.slow,
+            curve: UhfCurves.ease,
+            builder: (context, t, child) => Opacity(
+              opacity: t,
+              child: Transform.translate(offset: Offset(0, 12 * (1 - t)), child: child),
+            ),
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -58,6 +67,7 @@ class StudioPanel extends StatelessWidget {
               ],
               if (studio.exporting) _ExportBar(studio: studio) else _EditRow(studio: studio, onMenuOpenChanged: onMenuOpenChanged),
             ],
+          ),
           ),
         );
       },
@@ -77,16 +87,12 @@ class _EditRow extends StatelessWidget {
     final out = studio.outputSize;
     return Row(
       children: [
-        for (final r in Rotation.values) ...[
-          UhfChip(
-            label: StudioPanel.rotationLabel(r),
-            mono: true,
-            selected: studio.rotation == r,
-            onPressed: () => studio.setRotation(r),
-          ),
-          const SizedBox(width: 4),
-        ],
-        const SizedBox(width: 8),
+        _Segmented(
+          labels: [for (final r in Rotation.values) StudioPanel.rotationLabel(r)],
+          selected: Rotation.values.indexOf(studio.rotation),
+          onSelected: (i) => studio.setRotation(Rotation.values[i]),
+        ),
+        const SizedBox(width: 12),
         UhfChip(
           icon: UhfIcons.content_cut,
           label: l.studioTrim,
@@ -174,12 +180,13 @@ class _ExportButton extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: onPressed,
           child: Container(
-            height: 28,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: UhfColors.signal,
-              borderRadius: BorderRadius.circular(UhfRadii.sm),
+              borderRadius: BorderRadius.circular(UhfRadii.pill),
+              boxShadow: [BoxShadow(color: UhfColors.signal.withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 4))],
             ),
             child: Text(label, style: UhfText.sans(size: 13, weight: 500, color: UhfColors.ink)),
           ),
@@ -204,21 +211,29 @@ class _ExportBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: SizedBox(
-              height: 2,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  const ColoredBox(color: UhfColors.line),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      widthFactor: progress.fraction.clamp(0.0, 1.0),
-                      heightFactor: 1,
-                      child: const ColoredBox(color: UhfColors.signal),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(UhfRadii.pill),
+              child: SizedBox(
+                height: 6,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    const ColoredBox(color: UhfColors.line),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(end: progress.fraction.clamp(0.0, 1.0)),
+                        duration: UhfDurations.base,
+                        curve: UhfCurves.ease,
+                        builder: (context, f, _) => FractionallySizedBox(
+                          widthFactor: f,
+                          heightFactor: 1,
+                          child: const ColoredBox(color: UhfColors.signal),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -234,6 +249,76 @@ class _ExportBar extends StatelessWidget {
           const SizedBox(width: 12),
           UhfChip(label: l.actionCancel, onPressed: studio.cancelExport),
         ],
+      ),
+    );
+  }
+}
+
+/// Options in a rounded track; a pill slides under the chosen one.
+class _Segmented extends StatelessWidget {
+  const _Segmented({required this.labels, required this.selected, required this.onSelected});
+
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  static const _cell = 46.0;
+  static const _height = 30.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: UhfColors.text.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(UhfRadii.pill),
+        border: Border.all(color: UhfColors.line),
+      ),
+      child: SizedBox(
+        width: _cell * labels.length,
+        height: _height,
+        child: Stack(
+          children: [
+            AnimatedPositioned(
+              duration: UhfDurations.base,
+              curve: UhfCurves.spring,
+              left: _cell * selected,
+              width: _cell,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: UhfColors.text.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(UhfRadii.pill),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                for (var i = 0; i < labels.length; i++)
+                  SizedBox(
+                    width: _cell,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onSelected(i),
+                        child: Center(
+                          child: Text(
+                            labels[i],
+                            style: UhfText.mono(
+                              size: 12,
+                              color: i == selected ? UhfColors.text : UhfColors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

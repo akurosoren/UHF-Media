@@ -210,4 +210,13 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get toastRenameFailed => 'Dosya yeniden adlandırılamadı';
+
+  @override
+  String get buttonIdentify => 'Tanı';
+
+  @override
+  String get buttonListening => 'Dinleniyor';
+
+  @override
+  String get musicIdentified => 'Tanındı';
 }

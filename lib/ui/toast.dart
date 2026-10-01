@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -41,55 +42,83 @@ class ToastController extends ChangeNotifier {
 }
 
 class ToastHost extends StatelessWidget {
-  const ToastHost({super.key, required this.controller, this.bottom = 96});
+  const ToastHost({super.key, required this.controller, this.top = 16});
 
   final ToastController controller;
-  final double bottom;
+  final double top;
 
   @override
   Widget build(BuildContext context) {
     return Positioned(
       left: 16,
-      bottom: bottom,
+      right: 16,
+      top: top,
       child: ListenableBuilder(
         listenable: controller,
         builder: (context, _) {
           final message = controller.current;
-          return AnimatedSwitcher(
-            duration: UhfDurations.base,
-            child: message == null
-                ? const SizedBox.shrink(key: ValueKey('no-toast'))
-                : Container(
-                    key: ObjectKey(message),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: UhfColors.raised,
-                      borderRadius: BorderRadius.circular(UhfRadii.md),
-                      border: Border.all(color: UhfColors.line),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(message.text, style: UhfText.body),
-                        if (message.actionLabel != null) ...[
-                          const SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: () {
-                              message.onAction?.call();
-                              controller.dismiss();
-                            },
-                            child: MouseRegion(
-                              cursor: SystemMouseCursors.click,
-                              child: Text(
-                                message.actionLabel!,
-                                style: UhfText.sans(weight: 500, color: UhfColors.signal),
-                              ),
-                            ),
+          return Center(
+            child: AnimatedSwitcher(
+              duration: UhfDurations.base,
+              switchInCurve: UhfCurves.ease,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween(begin: const Offset(0, -0.6), end: Offset.zero).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: message == null
+                  ? const SizedBox.shrink(key: ValueKey('no-toast'))
+                  : ClipRRect(
+                      key: ObjectKey(message),
+                      borderRadius: BorderRadius.circular(UhfRadii.pill),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                          decoration: BoxDecoration(
+                            color: UhfColors.glass,
+                            borderRadius: BorderRadius.circular(UhfRadii.pill),
+                            border: Border.all(color: UhfColors.lineStrong),
                           ),
-                        ],
-                      ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 7,
+                                height: 7,
+                                decoration: const BoxDecoration(
+                                  color: UhfColors.signal,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(color: UhfColors.signal, blurRadius: 8)],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Flexible(child: Text(message.text, style: UhfText.body)),
+                              if (message.actionLabel != null) ...[
+                                const SizedBox(width: 16),
+                                GestureDetector(
+                                  onTap: () {
+                                    message.onAction?.call();
+                                    controller.dismiss();
+                                  },
+                                  child: MouseRegion(
+                                    cursor: SystemMouseCursors.click,
+                                    child: Text(
+                                      message.actionLabel!,
+                                      style: UhfText.sans(weight: 500, color: UhfColors.signal),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+            ),
           );
         },
       ),

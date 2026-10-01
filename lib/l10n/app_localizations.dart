@@ -483,6 +483,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t rename the file'**
   String get toastRenameFailed;
+
+  /// No description provided for @buttonIdentify.
+  ///
+  /// In en, this message translates to:
+  /// **'Identify'**
+  String get buttonIdentify;
+
+  /// No description provided for @buttonListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening'**
+  String get buttonListening;
+
+  /// No description provided for @musicIdentified.
+  ///
+  /// In en, this message translates to:
+  /// **'Identified'**
+  String get musicIdentified;
 }
 
 class _AppLocalizationsDelegate

@@ -28,7 +28,10 @@ import 'shell_controller.dart';
 import 'title_bar.dart';
 
 /// First media file opens; a subtitle file is added only to an open video.
-Future<void> handleDroppedPaths(List<String> paths, PlayerController player) async {
+Future<void> handleDroppedPaths(
+  List<String> paths,
+  PlayerController player,
+) async {
   final media = paths.where(isMediaFile).firstOrNull;
   if (media != null) {
     await player.open(media);
@@ -81,7 +84,10 @@ class _AppShellState extends State<AppShell> {
   /// picture (or while an export of a previous file is still running).
   bool get _studioShown {
     final studio = _studio;
-    return studio != null && studio.isOpen && _player.hasMedia && (studio.available || studio.exporting);
+    return studio != null &&
+        studio.isOpen &&
+        _player.hasMedia &&
+        (studio.available || studio.exporting);
   }
 
   late final StreamSubscription<PlayerEvent> _events;
@@ -138,7 +144,11 @@ class _AppShellState extends State<AppShell> {
           onAction: _player.restartFromBeginning,
         );
       case ScreenshotSavedEvent(:final path):
-        widget.toasts.show(l.toastScreenshotSaved, actionLabel: l.actionShow, onAction: () => widget.revealFile(path));
+        widget.toasts.show(
+          l.toastScreenshotSaved,
+          actionLabel: l.actionShow,
+          onAction: () => widget.revealFile(path),
+        );
       case OpenFailedEvent():
         widget.toasts.show(l.toastOpenFailed);
     }
@@ -150,7 +160,11 @@ class _AppShellState extends State<AppShell> {
     final toasts = widget.toasts;
     switch (event) {
       case ExportFinishedEvent(:final path):
-        toasts.show(l.toastExportDone, actionLabel: l.actionShow, onAction: () => widget.revealFile(path));
+        toasts.show(
+          l.toastExportDone,
+          actionLabel: l.actionShow,
+          onAction: () => widget.revealFile(path),
+        );
       case ExportCancelledEvent():
         toasts.show(l.toastExportCancelled);
       case ExportFailedEvent(:final log):
@@ -193,32 +207,51 @@ class _AppShellState extends State<AppShell> {
   Future<void> _open() async {
     final path = await widget.pickFile(widget.settings.value.lastOpenDir);
     if (path == null) return;
-    widget.settings.update((s) => s.copyWith(lastOpenDir: p.windows.dirname(path)));
+    widget.settings.update(
+      (s) => s.copyWith(lastOpenDir: p.windows.dirname(path)),
+    );
     await _player.open(path);
     _focus.requestFocus();
   }
 
   Map<ShortcutActivator, VoidCallback> get _bindings => {
     const SingleActivator(LogicalKeyboardKey.space): () => _player.togglePlay(),
-    const SingleActivator(LogicalKeyboardKey.arrowRight): () => _player.seekRelative(const Duration(seconds: 3)),
-    const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _player.seekRelative(const Duration(seconds: -3)),
-    const SingleActivator(LogicalKeyboardKey.arrowRight, shift: true): () => _player.frameStep(forward: true),
-    const SingleActivator(LogicalKeyboardKey.arrowLeft, shift: true): () => _player.frameStep(forward: false),
-    const SingleActivator(LogicalKeyboardKey.arrowUp): () => _player.adjustVolume(5),
-    const SingleActivator(LogicalKeyboardKey.arrowDown): () => _player.adjustVolume(-5),
+    const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+        _player.seekRelative(const Duration(seconds: 3)),
+    const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+        _player.seekRelative(const Duration(seconds: -3)),
+    const SingleActivator(LogicalKeyboardKey.arrowRight, shift: true): () =>
+        _player.frameStep(forward: true),
+    const SingleActivator(LogicalKeyboardKey.arrowLeft, shift: true): () =>
+        _player.frameStep(forward: false),
+    const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+        _player.adjustVolume(5),
+    const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+        _player.adjustVolume(-5),
     const SingleActivator(LogicalKeyboardKey.keyM): () => _player.toggleMute(),
-    const SingleActivator(LogicalKeyboardKey.keyF): () => _shell.toggleFullscreen(),
-    const SingleActivator(LogicalKeyboardKey.escape): () => _shell.exitFullscreen(),
-    const SingleActivator(LogicalKeyboardKey.keyO, control: true): () => _open(),
+    const SingleActivator(LogicalKeyboardKey.keyF): () =>
+        _shell.toggleFullscreen(),
+    const SingleActivator(LogicalKeyboardKey.escape): () =>
+        _shell.exitFullscreen(),
+    const SingleActivator(LogicalKeyboardKey.keyO, control: true): () =>
+        _open(),
     const SingleActivator(LogicalKeyboardKey.keyS): () => _player.screenshot(),
-    const SingleActivator(LogicalKeyboardKey.keyT, control: true): () => _shell.toggleAlwaysOnTop(),
-    const SingleActivator(LogicalKeyboardKey.keyE, includeRepeats: false): () => _studio?.toggle(),
-    const SingleActivator(LogicalKeyboardKey.keyI): () => _inStudio((s) => s.markIn()),
-    const SingleActivator(LogicalKeyboardKey.keyO): () => _inStudio((s) => s.markOut()),
-    const SingleActivator(LogicalKeyboardKey.keyR, includeRepeats: false): () => _inStudio((s) => s.cycleRotation()),
-    const SingleActivator(LogicalKeyboardKey.keyC, includeRepeats: false): () => _inStudio((s) => s.toggleCrop()),
-    const SingleActivator(LogicalKeyboardKey.keyE, control: true): () => _inStudio((s) => s.export()),
-    const SingleActivator(LogicalKeyboardKey.keyI, control: true): () => widget.music?.identify(),
+    const SingleActivator(LogicalKeyboardKey.keyT, control: true): () =>
+        _shell.toggleAlwaysOnTop(),
+    const SingleActivator(LogicalKeyboardKey.keyE, includeRepeats: false): () =>
+        _studio?.toggle(),
+    const SingleActivator(LogicalKeyboardKey.keyI): () =>
+        _inStudio((s) => s.markIn()),
+    const SingleActivator(LogicalKeyboardKey.keyO): () =>
+        _inStudio((s) => s.markOut()),
+    const SingleActivator(LogicalKeyboardKey.keyR, includeRepeats: false): () =>
+        _inStudio((s) => s.cycleRotation()),
+    const SingleActivator(LogicalKeyboardKey.keyC, includeRepeats: false): () =>
+        _inStudio((s) => s.toggleCrop()),
+    const SingleActivator(LogicalKeyboardKey.keyE, control: true): () =>
+        _inStudio((s) => s.export()),
+    const SingleActivator(LogicalKeyboardKey.keyI, control: true): () =>
+        widget.music?.identify(),
   };
 
   @override
@@ -232,30 +265,56 @@ class _AppShellState extends State<AppShell> {
           // Any click keeps keyboard focus on the window, never on a control.
           onPointerDown: (_) => _focus.requestFocus(),
           child: DropTarget(
-            onDragDone: (details) => handleDroppedPaths([for (final f in details.files) f.path], _player),
+            onDragDone: (details) => handleDroppedPaths([
+              for (final f in details.files) f.path,
+            ], _player),
             child: ListenableBuilder(
-              listenable: Listenable.merge([_player, _shell, _visibility, ?_studio]),
+              listenable: Listenable.merge([
+                _player,
+                _shell,
+                _visibility,
+                ?_studio,
+              ]),
               builder: (context, _) {
                 final studio = _studio;
-                final docked = studio != null && _studioShown && !_shell.fullscreen;
+                final docked =
+                    studio != null && _studioShown && !_shell.fullscreen;
                 return ColoredBox(
                   color: UhfColors.ink,
                   child: Column(
                     children: [
-                      if (!_shell.fullscreen) TitleBar(shell: _shell, fileName: _player.fileName, onOpen: _open),
-                      Expanded(child: _stage(context)),
-                      if (docked) ...[
-                        ControlsOverlay(
-                          player: _player,
+                      if (!_shell.fullscreen)
+                        TitleBar(
                           shell: _shell,
-                          settings: widget.settings,
-                          visibility: _studioVisibility,
-                          onMenuOpenChanged: _onMenuOpenChanged,
-                          studio: studio,
-                          music: widget.music,
+                          fileName: _player.fileName,
+                          onOpen: _open,
                         ),
-                        StudioPanel(studio: studio, player: _player, onMenuOpenChanged: _onMenuOpenChanged),
-                      ],
+                      Expanded(child: _stage(context)),
+                      AnimatedSize(
+                        duration: UhfDurations.slow,
+                        curve: UhfCurves.ease,
+                        alignment: Alignment.topCenter,
+                        child: !docked
+                            ? const SizedBox(width: double.infinity)
+                            : Column(
+                                children: [
+                                  ControlsOverlay(
+                                    player: _player,
+                                    shell: _shell,
+                                    settings: widget.settings,
+                                    visibility: _studioVisibility,
+                                    onMenuOpenChanged: _onMenuOpenChanged,
+                                    studio: studio,
+                                    music: widget.music,
+                                  ),
+                                  StudioPanel(
+                                    studio: studio,
+                                    player: _player,
+                                    onMenuOpenChanged: _onMenuOpenChanged,
+                                  ),
+                                ],
+                              ),
+                      ),
                     ],
                   ),
                 );
@@ -276,18 +335,19 @@ class _AppShellState extends State<AppShell> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (_player.hasMedia)
-            Listener(
-              onPointerSignal: (signal) {
-                if (signal is PointerScrollEvent) {
-                  _player.adjustVolume(signal.scrollDelta.dy < 0 ? 5 : -5);
-                }
-              },
-              child: GestureDetector(onDoubleTap: _shell.toggleFullscreen, child: widget.videoBuilder(context)),
-            )
-          else
-            const IdleScreen(),
-          if (studio != null && _studioShown && studio.cropEnabled) _cropLayer(studio),
+          Positioned.fill(
+            child: AnimatedSwitcher(
+            duration: UhfDurations.slow,
+            layoutBuilder: (current, previous) => Stack(fit: StackFit.expand, children: [...previous, ?current]),
+            switchInCurve: UhfCurves.ease,
+            child: _player.hasMedia
+                ? KeyedSubtree(
+                    key: const ValueKey('picture'),
+                    child: _picture(context, studio),
+                  )
+                : const IdleScreen(key: ValueKey('idle')),
+          ),
+          ),
           if (_player.hasMedia && !(_studioOpen && !_shell.fullscreen))
             Positioned(
               left: 0,
@@ -305,8 +365,8 @@ class _AppShellState extends State<AppShell> {
             ),
           if (widget.music != null)
             Positioned(
-              left: 14,
-              bottom: 140,
+              right: 24,
+              bottom: 116,
               child: MusicResultCard(
                 music: widget.music!,
                 onCopy: (text) => Clipboard.setData(ClipboardData(text: text)),
@@ -318,13 +378,53 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  /// The video, rounded and inset while the studio is open; the crop frame
+  /// shares its box so it stays on the picture.
+  Widget _picture(BuildContext context, StudioController? studio) {
+    final inset = studio != null && _studioShown && !_shell.fullscreen;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: inset ? 1.0 : 0.0),
+      duration: UhfDurations.slow,
+      curve: UhfCurves.ease,
+      builder: (context, t, _) => Padding(
+        padding: EdgeInsets.fromLTRB(16 * t, 6 * t, 16 * t, 6 * t),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(UhfRadii.lg * t),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Listener(
+                onPointerSignal: (signal) {
+                  if (signal is PointerScrollEvent) {
+                    _player.adjustVolume(signal.scrollDelta.dy < 0 ? 5 : -5);
+                  }
+                },
+                child: GestureDetector(
+                  onDoubleTap: _shell.toggleFullscreen,
+                  child: widget.videoBuilder(context),
+                ),
+              ),
+              if (studio != null && _studioShown && studio.cropEnabled)
+                _cropLayer(studio),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// The crop frame sits exactly on the picture, letterboxed like the video.
   Widget _cropLayer(StudioController studio) => LayoutBuilder(
     builder: (context, constraints) {
       final picture = studio.pictureSize;
       final rect = picture == null
           ? null
-          : CropMath.videoRectInViewport(picture, Rotation.none, constraints.maxWidth, constraints.maxHeight);
+          : CropMath.videoRectInViewport(
+              picture,
+              Rotation.none,
+              constraints.maxWidth,
+              constraints.maxHeight,
+            );
       if (rect == null) return const SizedBox.shrink();
       final out = studio.outputSize;
       return Stack(
@@ -337,7 +437,9 @@ class _AppShellState extends State<AppShell> {
             child: CropOverlay(
               crop: studio.crop,
               lockRatio: studio.cropLockRatio,
-              label: out == null ? '' : '${out.width} × ${out.height} · ${reducedRatio(out.width, out.height)}',
+              label: out == null
+                  ? ''
+                  : '${out.width} × ${out.height} · ${reducedRatio(out.width, out.height)}',
               onChanged: studio.setCrop,
             ),
           ),
