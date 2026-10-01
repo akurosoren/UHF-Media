@@ -129,8 +129,21 @@ abstract final class ExportCommandBuilder {
             ? probe.audioStreams.where((a) => a.index == plan.audioFfIndex).firstOrNull
             : probe.audioStreams.firstOrNull)
         ?.codec;
-    final audio = !isMp4Family(plan.outputPath) && _matroskaRejectedAudio.contains(audioCodec) ? 'flac' : 'copy';
-    args.addAll(['-pix_fmt', 'yuv420p', '-c:a', audio, '-map_metadata', '0', plan.outputPath]);
+    // With -ss before -i, a copied audio stream starts at the keyframe before
+    // the cut while the video starts exactly at the cut (checked with ffmpeg
+    // 8, 2026-10-01): a trim re-encodes the audio so both start together.
+    final audio = !isMp4Family(plan.outputPath) && _matroskaRejectedAudio.contains(audioCodec)
+        ? 'flac'
+        : trim != null
+            ? 'aac'
+            : 'copy';
+    args.addAll([
+      '-pix_fmt', 'yuv420p',
+      '-c:a', audio,
+      if (audio == 'aac') ...['-b:a', '256k'],
+      '-map_metadata', '0',
+      plan.outputPath,
+    ]);
 
     return ExportCommand(
       args: List.unmodifiable(args),

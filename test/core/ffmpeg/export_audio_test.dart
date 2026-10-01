@@ -14,9 +14,15 @@ ProbeResult _probe(List<AudioStreamInfo> audio) => ProbeResult(
       audioStreams: audio,
     );
 
-String _audioCodec(String output, List<AudioStreamInfo> audio, {int? audioFfIndex}) {
+String _audioCodec(String output, List<AudioStreamInfo> audio, {int? audioFfIndex, TrimRange? trim}) {
   final args = ExportCommandBuilder.build(
-    ExportPlan(inputPath: r'C:\v\in.m2ts', outputPath: output, rotation: Rotation.cw90, audioFfIndex: audioFfIndex),
+    ExportPlan(
+      inputPath: r'C:\v\in.m2ts',
+      outputPath: output,
+      rotation: Rotation.cw90,
+      audioFfIndex: audioFfIndex,
+      trim: trim,
+    ),
     _probe(audio),
   ).args;
   return args[args.indexOf('-c:a') + 1];
@@ -40,5 +46,21 @@ void main() {
 
   test('mov output keeps camera PCM as is', () {
     expect(_audioCodec(r'C:\v\in_rot90.mov', [const AudioStreamInfo(index: 1, codec: 'pcm_s16le')]), 'copy');
+  });
+
+  // With -ss before -i, a copied audio stream starts at the keyframe before
+  // the cut while the video starts at the cut: re-encode to keep them together.
+  const trim = TrimRange(Duration(seconds: 10), Duration(seconds: 20));
+
+  test('a trim re-encodes the audio to AAC (manual check finding)', () {
+    expect(_audioCodec(r'C:\v\in_rot90_trim.mkv', [lpcm, ac3], audioFfIndex: 2, trim: trim), 'aac');
+    expect(
+      _audioCodec(r'C:\v\in_rot90_trim.mov', [const AudioStreamInfo(index: 1, codec: 'pcm_s16le')], trim: trim),
+      'aac',
+    );
+  });
+
+  test('a trim of LPCM into mkv still uses FLAC', () {
+    expect(_audioCodec(r'C:\v\in_rot90_trim.mkv', [lpcm], audioFfIndex: 1, trim: trim), 'flac');
   });
 }

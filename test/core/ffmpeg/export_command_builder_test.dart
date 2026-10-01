@@ -102,7 +102,7 @@ void main() {
       '-map', '0:v:0', '-map', '0:a:0?',
       '-c:v', 'libx264', '-b:v', '8000000', '-minrate', '8000000', '-maxrate', '8000000',
       '-bufsize', '16000000', '-preset', 'medium',
-      '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-map_metadata', '0',
+      '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '256k', '-map_metadata', '0',
       'out.mkv',
     ]);
   });
