@@ -30,3 +30,6 @@ installer/Output/
 
 # Superpowers plan workspaces
 .superpowers/
+
+# Specs, plans and design previews stay local
+docs/
